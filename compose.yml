@@ -11,7 +11,7 @@ name: satpost
 
 services:
   ts:
-    image: tailscale/tailscale:${TAILSCALE_VERSION:-stable}
+    image: tailscale/tailscale:${TAILSCALE_VERSION:-v1.104.2}
     hostname: ${TS_HOSTNAME:-pay}
     environment:
       TS_HOSTNAME: ${TS_HOSTNAME:-pay}
