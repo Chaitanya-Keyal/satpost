@@ -6,7 +6,7 @@
 #   lnbits    the Lightning address (LNURLp), comments and zap receipts, holding only
 #             phoenixd's receive-only password
 # Nothing is published on the host. Your settings and secrets live in .env (gitignored);
-# run bin/setup for the first start. See README.md.
+# run bin/satpost setup for the first start. See README.md.
 name: satpost
 
 services:
