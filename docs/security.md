@@ -31,31 +31,49 @@ directory.
 ## Your tailnet policy is required
 
 The Tailscale container runs in userspace mode, which forwards tailnet connections for _any_
-port that serve doesn't handle to that port in the namespace, such as LNbits' plain HTTP port 5000. Binding loopback keeps the services off the host, not off the tailnet. Only your policy decides which
-devices reach which ports, so no rule may reach `tag:pay` except the ones below. A policy that
-allows everything to everything has to narrow first, for example to `autogroup:self`, which
-covers your own devices but not tagged ones.
+port that serve doesn't handle to that port in the namespace, including LNbits' plain HTTP on
+port 5000. Binding loopback keeps the services off the host, not off the tailnet. Only your
+policy decides which devices reach which ports, so no rule may reach `tag:pay` except the ones
+below. A policy that allows everything to everything has to narrow first, for example to
+`autogroup:self`, which covers your own devices but not tagged ones.
 
 ```jsonc
 {
-  "tagOwners": { "tag:pay": ["autogroup:admin"] },
-  // Optional: a device allowed to read phoenixd's API, such as a satbook dashboard. If that
-  // device is tagged, use its tag as the source below instead of a host entry.
-  "hosts": { "ledger": "100.64.0.10" },
+  "tagOwners": {
+    "tag:pay": ["autogroup:admin"],
+    // Optional: a dashboard that reads phoenixd's API, such as satbook, on a tagged device.
+    "tag:satbook": ["autogroup:admin"]
+  },
   "nodeAttrs": [{ "target": ["tag:pay"], "attr": ["funnel"] }],
   "grants": [
     // Your own devices keep reaching each other. Tagged devices aren't in autogroup:self.
     { "src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"] },
     // The LNbits admin page.
     { "src": ["autogroup:member"], "dst": ["tag:pay"], "ip": ["tcp:8443"] },
-    // Optional: the dashboard.
-    { "src": ["ledger"], "dst": ["tag:pay"], "ip": ["tcp:9740", "tcp:8443"] }
+    // Optional: the dashboard. If its device isn't tagged, name it with a hosts entry instead.
+    { "src": ["tag:satbook"], "dst": ["tag:pay"], "ip": ["tcp:9740", "tcp:8443"] }
+  ],
+  // Checked on every save: each port is open to exactly who should reach it, and LNbits' raw
+  // port 5000 to no one.
+  "tests": [
+    {
+      "src": "you@example.com",
+      "accept": ["tag:pay:8443"],
+      "deny": ["tag:pay:5000", "tag:pay:9740"]
+    },
+    {
+      "src": "tag:satbook",
+      "accept": ["tag:pay:9740", "tag:pay:8443"],
+      "deny": ["tag:pay:5000"]
+    }
   ]
 }
 ```
 
-Adapt this to your existing policy. Narrow the admin rule to your phone and laptop if other
-people or automated accounts use your devices.
+Adapt this to your existing policy, with your own login in the tests. Narrow the admin rule to
+your phone and laptop if other people or automated accounts use your devices. Tailscale's
+default policy also gives all your devices the `funnel` attribute. satpost only needs it on
+`tag:pay`, so remove the default one unless you use Funnel elsewhere.
 
 ## Where the secrets live
 
