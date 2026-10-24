@@ -2,7 +2,7 @@
 
 Nothing public can spend. The internet only reaches two LNbits endpoints, and LNbits only has
 phoenixd's receive-only password. The password that can spend never leaves phoenixd's container;
-you use it through `bin/satpost` over SSH.
+you use it through `satpost` over SSH.
 
 ## What can reach what
 
@@ -70,7 +70,7 @@ people or automated accounts use your devices.
 | Zap signing key | LNbits' database | optional; a new one only needs the address file refreshed |
 | Tailscale auth key | `.env`; single-use, so spent after the first login | none needed |
 
-`bin/satpost` never puts a secret on a command line, where every user on the host could read
+`satpost` never puts a secret on a command line, where every user on the host could read
 it; values go to `.env` through shell builtins only. LNbits prints the first-install token to
 its container log on a fresh install, which only root and the docker group can read.
 

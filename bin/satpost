@@ -102,10 +102,9 @@ setup() {
   cat <<EOF
 
 Next, in order (README.md has the details):
-  1. Tailscale: if TS_AUTHKEY was empty, open the login link in: ${docker[*]} compose logs ts
+  1. Tailscale: if TS_AUTHKEY was empty, open the login link in: satpost logs ts
      Apply the ACL from docs/security.md before going further.
-  2. Back up phoenixd's seed yourself, on paper only:
-       ${docker[*]} compose exec phoenixd cat /phoenix/.phoenix/seed.dat
+  2. Back up phoenixd's seed yourself, on paper only: satpost seed
   3. LNbits: open https://$(envvar TS_HOSTNAME).<your-tailnet>.ts.net:8443 and complete the first
      install with LNBITS_FIRST_INSTALL_TOKEN from .env.
 EOF
@@ -136,7 +135,20 @@ restore() {
   fi
   printf '%s\n' "${list[*]}" |
     dc run --rm --no-deps -T --entrypoint sh phoenixd -c 'umask 077; cat >/phoenix/.phoenix/seed.dat'
-  echo "Seed written. Now run: bin/satpost setup"
+  echo "Seed written. Now run: satpost setup"
+}
+
+seed() {
+  # Refuses unless both ends are a terminal, so the words can't end up in a pipe, a log or a
+  # tool's captured output.
+  if [ ! -t 0 ] || [ ! -t 1 ]; then
+    echo "satpost seed only runs in an interactive terminal." >&2
+    exit 1
+  fi
+  echo "This shows the 12 words that control your funds. Make sure nobody can see your screen."
+  confirm show
+  dc exec -T phoenixd cat /phoenix/.phoenix/seed.dat </dev/null
+  printf '\n\nWrite them on paper, then clear the screen and your scrollback.\n'
 }
 
 cli_conf() { # read one key from phoenixd's phoenix.conf; prints nothing if unavailable
@@ -157,6 +169,10 @@ usage: satpost <command>
 
   setup                                first start; safe to re-run
   restore                              put an existing seed in place, before the first setup
+  seed                                 show the seed, to write it down (interactive only)
+  up                                   apply changes to .env, e.g. SATPOST_SERVE
+  update                               pull the versions set in .env and restart
+  logs [service]                       follow the logs (ts, phoenixd or lnbits)
   info                                 node id, channels and version
   balance                              balance and fee credit, in sats
   channels                             channel capacity and inbound liquidity
@@ -176,6 +192,10 @@ cmd=${1:-help}
 case $cmd in
   setup) setup ;;
   restore) restore ;;
+  seed) seed ;;
+  up) dc up -d ;;
+  update) dc pull && dc up -d ;;
+  logs) dc logs --tail 100 -f "$@" ;;
   info) cli getinfo ;;
   balance) cli getbalance ;;
   channels) cli listchannels ;;

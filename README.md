@@ -9,8 +9,8 @@ wallet.
 - Only the address lookup and invoice creation are public, through Tailscale Funnel. Everything
   else stays on your tailnet.
 - LNbits only has phoenixd's receive-only password, so nothing public can spend your money.
-- You spend with `bin/satpost` over SSH: pay invoices and Lightning addresses, or sweep on-chain.
-  It's a small wrapper around phoenix-cli.
+- You spend with the `satpost` command over SSH: pay invoices and Lightning addresses, or sweep
+  on-chain. It's a small wrapper around phoenix-cli.
 
 Best when you mostly receive, like donations or tips. Spending works too, from the command line.
 
@@ -24,7 +24,7 @@ one network namespace, owned by the Tailscale container:
    LNbits   127.0.0.1:5000  ── receive-only password ──►  phoenixd 127.0.0.1:9740 ──► ACINQ
    tailnet only:  :8443 LNbits admin     :9740 phoenixd API (for a dashboard, if you allow one)
 
-spending:  ssh host → bin/satpost pay … / bin/satpost sweep …
+spending:  ssh host → satpost pay … / satpost sweep …
 ```
 
 Nothing is published on the host, and the services only listen on localhost inside the
@@ -55,27 +55,28 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
 1. **Tailscale policy.** Add the `tag:pay` owner, the Funnel attribute and the access rules
    from [docs/security.md](docs/security.md). Optionally create a single-use, pre-approved auth
    key tagged `tag:pay`.
-2. **Configure.** `git clone` this repo on the host, run `bin/satpost setup` once to create
-   `.env`, edit it (`TS_HOSTNAME`, `TS_AUTHKEY`, `SATPOST_DOCKER`), then run `bin/satpost setup`
-   again. It generates LNbits' secrets, starts phoenixd, hands LNbits the receive-only password
-   and starts LNbits. Re-running it is safe.
-3. **Log the device in**, if you left `TS_AUTHKEY` empty: open the link in
-   `docker compose logs ts` and tag the device `tag:pay` in the admin console. A tagged device
+2. **Configure.** `git clone` this repo on the host and put the command on your PATH:
+   `ln -s "$PWD/bin/satpost" ~/.local/bin/satpost`. Run `satpost setup` once to create `.env`,
+   edit it (`TS_HOSTNAME`, `TS_AUTHKEY`, `SATPOST_DOCKER`), then run `satpost setup` again. It
+   generates LNbits' secrets, starts phoenixd, hands LNbits the receive-only password and starts
+   LNbits. Re-running it is safe.
+3. **Log the device in**, if you left `TS_AUTHKEY` empty: open the link in `satpost logs ts`
+   and tag the device `tag:pay` in the admin console. A tagged device
    belongs to the tag rather than to you, so `autogroup:self` rules don't reach it, and its key
    no longer expires.
-4. **Back up the seed yourself**, on paper, and keep it offline:
-   `docker compose exec phoenixd cat /phoenix/.phoenix/seed.dat`. Twelve words restore the wallet,
-   channel included (ACINQ keeps an encrypted copy of the channel state for you).
+4. **Back up the seed yourself**, on paper, and keep it offline: `satpost seed`. Twelve words
+   restore the wallet, channel included (ACINQ keeps an encrypted copy of the channel state for
+   you).
 5. **LNbits.** Open `https://<TS_HOSTNAME>.<tailnet>.ts.net:8443`, finish the first install with
    `LNBITS_FIRST_INSTALL_TOKEN` from `.env`, and turn on two-factor login. Under Extensions,
    enable Pay Links, then create a pay link with your username, your domain, comments allowed and
    zaps on. LNbits fixes the description wallets show to "Payment to `<username>`".
-6. **Fund the channel.** `bin/satpost fees 35000` shows the purchase fee for a 35k payment; pay
-   comfortably more than that to `bin/satpost invoice 35000 bootstrap` from another wallet, then
-   check `bin/satpost channels`. A payment only just above the estimate can still land in fee
+6. **Fund the channel.** `satpost fees 35000` shows the purchase fee for a 35k payment; pay
+   comfortably more than that to `satpost invoice 35000 bootstrap` from another wallet, then
+   check `satpost channels`. A payment only just above the estimate can still land in fee
    credit, because phoenixd decides with a raised feerate.
 7. **Open the payment paths.** Set `SATPOST_SERVE=serve.funnel` in `.env` and run
-   `docker compose up -d`. From outside your tailnet,
+   `satpost up`. From outside your tailnet,
    `https://<TS_HOSTNAME>.<tailnet>.ts.net/.well-known/lnurlp/<username>` now answers.
 8. **Publish the address file.** Save that response byte for byte as
    `https://yourdomain.com/.well-known/lnurlp/<username>`. On GitHub Pages, add `.nojekyll` so the
@@ -86,12 +87,12 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
 ## Everyday use
 
 ```
-bin/satpost balance                        balance and fee credit
-bin/satpost payments 20                    recent incoming payments
-bin/satpost pay <invoice>                  pay a Lightning invoice
-bin/satpost pay <user@domain> <sats>       pay a Lightning address
-bin/satpost sweep <address> <sats> <fee>   send on-chain; check the address on your signer first
-bin/satpost help                           everything else
+satpost balance                        balance and fee credit
+satpost payments 20                    recent incoming payments
+satpost pay <invoice>                  pay a Lightning invoice
+satpost pay <user@domain> <sats>       pay a Lightning address
+satpost sweep <address> <sats> <fee>   send on-chain; check the address on your signer first
+satpost help                           everything else
 ```
 
 [docs/operations.md](docs/operations.md) covers sweeping, liquidity, updates, backups and
