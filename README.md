@@ -60,7 +60,9 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
    again. It generates LNbits' secrets, starts phoenixd, hands LNbits the receive-only password
    and starts LNbits. Re-running it is safe.
 3. **Log the device in**, if you left `TS_AUTHKEY` empty: open the link in
-   `docker compose logs ts` and tag the device `tag:pay` in the admin console.
+   `docker compose logs ts` and tag the device `tag:pay` in the admin console. A tagged device
+   belongs to the tag rather than to you, so `autogroup:self` rules don't reach it, and its key
+   no longer expires.
 4. **Back up the seed yourself**, on paper, and keep it offline:
    `docker compose exec phoenixd cat /phoenix/.phoenix/seed.dat`. Twelve words restore the wallet,
    channel included (ACINQ keeps an encrypted copy of the channel state for you).

@@ -40,7 +40,8 @@ covers your own devices but not tagged ones.
 ```jsonc
 {
   "tagOwners": { "tag:pay": ["autogroup:admin"] },
-  // Optional: a device allowed to read phoenixd's API, such as a satbook dashboard.
+  // Optional: a device allowed to read phoenixd's API, such as a satbook dashboard. If that
+  // device is tagged, use its tag as the source below instead of a host entry.
   "hosts": { "ledger": "100.64.0.10" },
   "nodeAttrs": [{ "target": ["tag:pay"], "attr": ["funnel"] }],
   "grants": [
