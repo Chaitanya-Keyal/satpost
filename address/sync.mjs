@@ -15,9 +15,9 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path';
 
 const env = (name) => {
-	const value = process.env[name];
-	if (!value) throw new Error(`${name} is not set`);
-	return value;
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set`);
+  return value;
 };
 const SOURCE = env('LNADDRESS_SOURCE');
 const TARGET = env('LNADDRESS_TARGET');
@@ -36,28 +36,28 @@ const metadata = JSON.parse(lnurl.metadata);
 const problems = [];
 if (lnurl.tag !== 'payRequest') problems.push(`tag is ${lnurl.tag ?? lnurl.reason}`);
 if (callback.protocol !== 'https:' || callback.hostname !== CALLBACK_HOST) {
-	problems.push(`callback moved to ${callback.origin}`);
+  problems.push(`callback moved to ${callback.origin}`);
 }
 if (!metadata.some(([type, value]) => type === 'text/identifier' && value === IDENTIFIER)) {
-	problems.push(`metadata no longer names ${IDENTIFIER}`);
+  problems.push(`metadata no longer names ${IDENTIFIER}`);
 }
 if (
-	!Number.isInteger(lnurl.minSendable) ||
-	!Number.isInteger(lnurl.maxSendable) ||
-	lnurl.minSendable > lnurl.maxSendable
+  !Number.isInteger(lnurl.minSendable) ||
+  !Number.isInteger(lnurl.maxSendable) ||
+  lnurl.minSendable > lnurl.maxSendable
 ) {
-	problems.push('sendable range is malformed');
+  problems.push('sendable range is malformed');
 }
 if (problems.length) throw new Error(`refusing the response: ${problems.join('; ')}`);
 
 let current = null;
 try {
-	current = readFileSync(TARGET, 'utf8');
+  current = readFileSync(TARGET, 'utf8');
 } catch {}
 const changed = current !== body;
 if (changed) {
-	mkdirSync(dirname(TARGET), { recursive: true });
-	writeFileSync(TARGET, body);
+  mkdirSync(dirname(TARGET), { recursive: true });
+  writeFileSync(TARGET, body);
 }
 console.log(changed ? `updated ${TARGET}` : `${TARGET} is current`);
 if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `changed=${changed}\n`);

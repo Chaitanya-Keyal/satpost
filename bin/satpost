@@ -14,27 +14,27 @@ cd "$root"
 env_file=$root/.env
 
 envvar() { # NAME from the environment, else the last NAME=value in .env
-	local line value=${!1:-}
-	if [ -z "$value" ] && [ -f "$env_file" ]; then
-		while IFS= read -r line || [ -n "$line" ]; do
-			[[ $line == "$1="* ]] && value=${line#*=}
-		done <"$env_file"
-	fi
-	printf '%s' "$value"
+  local line value=${!1:-}
+  if [ -z "$value" ] && [ -f "$env_file" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      [[ $line == "$1="* ]] && value=${line#*=}
+    done <"$env_file"
+  fi
+  printf '%s' "$value"
 }
 
 setvar() { # replace NAME=... in .env, or append it
-	local name=$1 value=$2 line found= lines=()
-	while IFS= read -r line || [ -n "$line" ]; do
-		if [[ $line == "$name="* ]]; then
-			lines+=("$name=$value")
-			found=1
-		else
-			lines+=("$line")
-		fi
-	done <"$env_file"
-	[ -n "$found" ] || lines+=("$name=$value")
-	printf '%s\n' "${lines[@]}" >"$env_file"
+  local name=$1 value=$2 line found= lines=()
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ $line == "$name="* ]]; then
+      lines+=("$name=$value")
+      found=1
+    else
+      lines+=("$line")
+    fi
+  done <"$env_file"
+  [ -n "$found" ] || lines+=("$name=$value")
+  printf '%s\n' "${lines[@]}" >"$env_file"
 }
 
 read -r -a docker <<<"$(envvar SATPOST_DOCKER)"
@@ -44,62 +44,62 @@ dc() { "${docker[@]}" compose --project-directory "$root" "$@"; }
 cli() { dc exec -T phoenixd /phoenix/phoenix-cli "$@" </dev/null; }
 
 confirm() {
-	local answer
-	read -r -p "Type \"$1\" to confirm: " answer
-	[ "$answer" = "$1" ] || { echo "cancelled"; exit 1; }
+  local answer
+  read -r -p "Type \"$1\" to confirm: " answer
+  [ "$answer" = "$1" ] || { echo "cancelled"; exit 1; }
 }
 
 setup() {
-	if [ ! -f "$env_file" ]; then
-		cp "$root/.env.example" "$env_file"
-		chmod 600 "$env_file"
-		echo "Created .env. Review it (TS_HOSTNAME, TS_AUTHKEY, SATPOST_DOCKER), then run setup again."
-		return
-	fi
-	chmod 600 "$env_file"
+  if [ ! -f "$env_file" ]; then
+    cp "$root/.env.example" "$env_file"
+    chmod 600 "$env_file"
+    echo "Created .env. Review it (TS_HOSTNAME, TS_AUTHKEY, SATPOST_DOCKER), then run setup again."
+    return
+  fi
+  chmod 600 "$env_file"
 
-	local random
-	if [ -z "$(envvar LNBITS_FIRST_INSTALL_TOKEN)" ]; then
-		random=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
-		setvar LNBITS_FIRST_INSTALL_TOKEN "$random"
-	fi
-	if [ -z "$(envvar LNBITS_AUTH_SECRET_KEY)" ]; then
-		random=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
-		setvar LNBITS_AUTH_SECRET_KEY "$random"
-	fi
+  local random
+  if [ -z "$(envvar LNBITS_FIRST_INSTALL_TOKEN)" ]; then
+    random=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
+    setvar LNBITS_FIRST_INSTALL_TOKEN "$random"
+  fi
+  if [ -z "$(envvar LNBITS_AUTH_SECRET_KEY)" ]; then
+    random=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
+    setvar LNBITS_AUTH_SECRET_KEY "$random"
+  fi
 
-	echo "Starting tailscale and phoenixd..."
-	dc up -d ts phoenixd
+  echo "Starting tailscale and phoenixd..."
+  dc up -d ts phoenixd
 
-	# phoenixd writes its passwords to phoenix.conf on first start.
-	local password=
-	for _ in $(seq 60); do
-		password=$(cli_conf http-password-limited-access)
-		[ -n "$password" ] && break
-		sleep 2
-	done
-	if [ -z "$password" ]; then
-		echo "phoenixd hasn't written its passwords. Check: ${docker[*]} compose logs phoenixd" >&2
-		exit 1
-	fi
-	if [ "$(envvar PHOENIXD_LIMITED_PASSWORD)" != "$password" ]; then
-		setvar PHOENIXD_LIMITED_PASSWORD "$password"
-	fi
+  # phoenixd writes its passwords to phoenix.conf on first start.
+  local password=
+  for _ in $(seq 60); do
+    password=$(cli_conf http-password-limited-access)
+    [ -n "$password" ] && break
+    sleep 2
+  done
+  if [ -z "$password" ]; then
+    echo "phoenixd hasn't written its passwords. Check: ${docker[*]} compose logs phoenixd" >&2
+    exit 1
+  fi
+  if [ "$(envvar PHOENIXD_LIMITED_PASSWORD)" != "$password" ]; then
+    setvar PHOENIXD_LIMITED_PASSWORD "$password"
+  fi
 
-	echo "Starting lnbits..."
-	dc up -d lnbits
-	# On its first start LNbits installs the LNURLp extension but only loads it after a
-	# restart, so wait for that start to finish and restart it once.
-	if ! dc exec -T lnbits test -f /app/data/.satpost-extensions-loaded 2>/dev/null; then
-		for _ in $(seq 90); do
-			dc logs lnbits 2>/dev/null | grep -q 'Application startup complete' && break
-			sleep 2
-		done
-		dc restart lnbits >/dev/null
-		dc exec -T lnbits touch /app/data/.satpost-extensions-loaded
-	fi
+  echo "Starting lnbits..."
+  dc up -d lnbits
+  # On its first start LNbits installs the LNURLp extension but only loads it after a
+  # restart, so wait for that start to finish and restart it once.
+  if ! dc exec -T lnbits test -f /app/data/.satpost-extensions-loaded 2>/dev/null; then
+    for _ in $(seq 90); do
+      dc logs lnbits 2>/dev/null | grep -q 'Application startup complete' && break
+      sleep 2
+    done
+    dc restart lnbits >/dev/null
+    dc exec -T lnbits touch /app/data/.satpost-extensions-loaded
+  fi
 
-	cat <<EOF
+  cat <<EOF
 
 Next, in order (README.md has the details):
   1. Tailscale: if TS_AUTHKEY was empty, open the login link in: ${docker[*]} compose logs ts
@@ -112,47 +112,47 @@ EOF
 }
 
 restore() {
-	[ -f "$env_file" ] || { echo "Run setup first to create .env." >&2; exit 1; }
-	# One-off phoenixd containers join the ts container's namespace, so it has to be up.
-	dc up -d ts </dev/null >/dev/null
-	if dc run --rm --no-deps -T --entrypoint test phoenixd -f /phoenix/.phoenix/seed.dat </dev/null 2>/dev/null; then
-		echo "This wallet already has a seed; refusing to overwrite it." >&2
-		exit 1
-	fi
-	local words word list
-	if [ -t 0 ]; then
-		read -r -s -p "Type the 12 words separated by spaces, then Enter (nothing is shown): " words
-		echo
-	else
-		words=$(cat)
-	fi
-	read -r -a list <<<"${words//$'\n'/ }"
-	for word in "${list[@]}"; do
-		[[ $word =~ ^[a-z]+$ ]] || { echo "Words are lowercase letters only." >&2; exit 1; }
-	done
-	if [ ${#list[@]} -ne 12 ] && [ ${#list[@]} -ne 24 ]; then
-		echo "Expected 12 or 24 words, got ${#list[@]}." >&2
-		exit 1
-	fi
-	printf '%s\n' "${list[*]}" |
-		dc run --rm --no-deps -T --entrypoint sh phoenixd -c 'umask 077; cat >/phoenix/.phoenix/seed.dat'
-	echo "Seed written. Now run: bin/satpost setup"
+  [ -f "$env_file" ] || { echo "Run setup first to create .env." >&2; exit 1; }
+  # One-off phoenixd containers join the ts container's namespace, so it has to be up.
+  dc up -d ts </dev/null >/dev/null
+  if dc run --rm --no-deps -T --entrypoint test phoenixd -f /phoenix/.phoenix/seed.dat </dev/null 2>/dev/null; then
+    echo "This wallet already has a seed; refusing to overwrite it." >&2
+    exit 1
+  fi
+  local words word list
+  if [ -t 0 ]; then
+    read -r -s -p "Type the 12 words separated by spaces, then Enter (nothing is shown): " words
+    echo
+  else
+    words=$(cat)
+  fi
+  read -r -a list <<<"${words//$'\n'/ }"
+  for word in "${list[@]}"; do
+    [[ $word =~ ^[a-z]+$ ]] || { echo "Words are lowercase letters only." >&2; exit 1; }
+  done
+  if [ ${#list[@]} -ne 12 ] && [ ${#list[@]} -ne 24 ]; then
+    echo "Expected 12 or 24 words, got ${#list[@]}." >&2
+    exit 1
+  fi
+  printf '%s\n' "${list[*]}" |
+    dc run --rm --no-deps -T --entrypoint sh phoenixd -c 'umask 077; cat >/phoenix/.phoenix/seed.dat'
+  echo "Seed written. Now run: bin/satpost setup"
 }
 
 cli_conf() { # read one key from phoenixd's phoenix.conf; prints nothing if unavailable
-	dc exec -T phoenixd sed -n "s/^$1=//p" /phoenix/.phoenix/phoenix.conf </dev/null 2>/dev/null || true
+  dc exec -T phoenixd sed -n "s/^$1=//p" /phoenix/.phoenix/phoenix.conf </dev/null 2>/dev/null || true
 }
 
 liquidity_sats() {
-	case $(envvar PHOENIXD_AUTO_LIQUIDITY) in
-		5m) echo 5000000 ;;
-		10m) echo 10000000 ;;
-		*) echo 2000000 ;;
-	esac
+  case $(envvar PHOENIXD_AUTO_LIQUIDITY) in
+    5m) echo 5000000 ;;
+    10m) echo 10000000 ;;
+    *) echo 2000000 ;;
+  esac
 }
 
 usage() {
-	cat <<'EOF'
+  cat <<'EOF'
 usage: satpost <command>
 
   setup                                first start; safe to re-run
@@ -174,45 +174,45 @@ EOF
 cmd=${1:-help}
 [ $# -gt 0 ] && shift
 case $cmd in
-	setup) setup ;;
-	restore) restore ;;
-	info) cli getinfo ;;
-	balance) cli getbalance ;;
-	channels) cli listchannels ;;
-	payments) cli listincomingpayments --limit "${1:-10}" ;;
-	fees) cli estimateliquidityfees --amountSat "$(($(liquidity_sats) + ${1:-0}))" ;;
-	invoice)
-		[ $# -ge 1 ] || { usage >&2; exit 2; }
-		cli createinvoice --amountSat "$1" --description "${2:-satpost}"
-		;;
-	pay)
-		[ $# -ge 1 ] || { usage >&2; exit 2; }
-		if [[ $1 == *@* ]]; then
-			[ $# -ge 2 ] || { usage >&2; exit 2; }
-			echo "Paying $2 sats to $1"
-			confirm pay
-			if [ $# -ge 3 ]; then
-				cli paylnaddress --address "$1" --amountSat "$2" --message "$3"
-			else
-				cli paylnaddress --address "$1" --amountSat "$2"
-			fi
-		else
-			cli decodeinvoice --invoice "$1"
-			confirm pay
-			cli payinvoice --invoice "$1"
-		fi
-		;;
-	sweep)
-		[ $# -eq 3 ] || { usage >&2; exit 2; }
-		printf 'Sending %s sats on-chain at %s sat/vB to:\n\n    ' "$2" "$3"
-		printf '%s\n' "$1" | fold -w4 | paste -sd' ' -
-		printf '\nCompare every group with the address shown on your signing device.\n'
-		confirm send
-		cli sendtoaddress --address "$1" --amountSat "$2" --feerateSatByte "$3"
-		;;
-	help | -h | --help) usage ;;
-	*)
-		usage >&2
-		exit 2
-		;;
+  setup) setup ;;
+  restore) restore ;;
+  info) cli getinfo ;;
+  balance) cli getbalance ;;
+  channels) cli listchannels ;;
+  payments) cli listincomingpayments --limit "${1:-10}" ;;
+  fees) cli estimateliquidityfees --amountSat "$(($(liquidity_sats) + ${1:-0}))" ;;
+  invoice)
+    [ $# -ge 1 ] || { usage >&2; exit 2; }
+    cli createinvoice --amountSat "$1" --description "${2:-satpost}"
+    ;;
+  pay)
+    [ $# -ge 1 ] || { usage >&2; exit 2; }
+    if [[ $1 == *@* ]]; then
+      [ $# -ge 2 ] || { usage >&2; exit 2; }
+      echo "Paying $2 sats to $1"
+      confirm pay
+      if [ $# -ge 3 ]; then
+        cli paylnaddress --address "$1" --amountSat "$2" --message "$3"
+      else
+        cli paylnaddress --address "$1" --amountSat "$2"
+      fi
+    else
+      cli decodeinvoice --invoice "$1"
+      confirm pay
+      cli payinvoice --invoice "$1"
+    fi
+    ;;
+  sweep)
+    [ $# -eq 3 ] || { usage >&2; exit 2; }
+    printf 'Sending %s sats on-chain at %s sat/vB to:\n\n    ' "$2" "$3"
+    printf '%s\n' "$1" | fold -w4 | paste -sd' ' -
+    printf '\nCompare every group with the address shown on your signing device.\n'
+    confirm send
+    cli sendtoaddress --address "$1" --amountSat "$2" --feerateSatByte "$3"
+    ;;
+  help | -h | --help) usage ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
 esac
