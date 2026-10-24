@@ -12,7 +12,7 @@ wallet.
 - You spend with `bin/satpost` over SSH: pay invoices and Lightning addresses, or sweep on-chain.
   It's a small wrapper around phoenix-cli.
 
-Built for donations and tips.
+Best when you mostly receive, like donations or tips. Spending works too, from the command line.
 
 ## How it works
 
