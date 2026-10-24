@@ -1,8 +1,8 @@
 # Security
 
-satpost keeps money and exposure apart: the only component the internet can reach can create
-invoices but can't spend, and the only credential that can spend never leaves phoenixd's
-container.
+Nothing public can spend. The internet only reaches two LNbits endpoints, and LNbits only has
+phoenixd's receive-only password. The password that can spend never leaves phoenixd's container;
+you use it through `bin/satpost` over SSH.
 
 ## What can reach what
 

@@ -1,4 +1,4 @@
-# satpost: a self-hosted Lightning address that only ever receives.
+# satpost: a self-hosted Lightning address.
 #
 # All three containers share one network namespace, owned by the Tailscale container:
 #   ts        joins your tailnet as its own device and serves HTTPS (serve/)

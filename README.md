@@ -1,17 +1,18 @@
 # satpost
 
-_a self-hosted Lightning address that only ever receives._
+_a self-hosted Lightning address._
 
-Give people `you@yourdomain.com` and have their payments land in your own
-[phoenixd](https://github.com/ACINQ/phoenixd) wallet. [LNbits](https://github.com/lnbits/lnbits)
-answers the address (with payer comments and nostr zaps), Tailscale Funnel puts just the two
-payment endpoints on the internet, and everything else stays on your tailnet. The part that
-faces the internet holds only phoenixd's **receive-only** password, so even a full compromise
-of it can't spend your balance. Sweeps to cold storage go through a small CLI over SSH.
+Get paid at `you@yourdomain.com`, straight into your own [phoenixd](https://github.com/ACINQ/phoenixd)
+wallet.
 
-Made for donations and tips: a receive-heavy wallet that you empty to your hardware wallet
-from time to time. It pairs with [satbook](https://github.com/Chaitanya-Keyal/satbook) for a
-ledger and India VDA tax view, but needs nothing else.
+- [LNbits](https://github.com/lnbits/lnbits) answers the address, with payer comments and nostr zaps.
+- Only the address lookup and invoice creation are public, through Tailscale Funnel. Everything
+  else stays on your tailnet.
+- LNbits only has phoenixd's receive-only password, so nothing public can spend your money.
+- You spend with `bin/satpost` over SSH: pay invoices and Lightning addresses, or sweep on-chain.
+  It's a small wrapper around phoenix-cli.
+
+Built for donations and tips.
 
 ## How it works
 
@@ -23,13 +24,12 @@ one network namespace, owned by the Tailscale container:
    LNbits   127.0.0.1:5000  ── receive-only password ──►  phoenixd 127.0.0.1:9740 ──► ACINQ
    tailnet only:  :8443 LNbits admin     :9740 phoenixd API (for a dashboard, if you allow one)
 
-sweeps:  ssh host → bin/satpost sweep <address> <sats> <sat/vB> ──► your cold wallet
+spending:  ssh host → bin/satpost pay … / bin/satpost sweep …
 ```
 
-Nothing is published on the host, and the services bind loopback inside the namespace, so
-other users on the same machine can't reach them either. Tailscale's userspace networking does
-forward tailnet traffic to any port in that namespace, which makes your tailnet policy part of
-the security model: see [docs/security.md](docs/security.md).
+Nothing is published on the host, and the services only listen on localhost inside the
+namespace. Tailscale still forwards tailnet traffic to any port in there, so your tailnet
+policy matters: see [docs/security.md](docs/security.md).
 
 ## What it costs
 
@@ -86,10 +86,12 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
 ## Everyday use
 
 ```
-bin/satpost balance                       balance and fee credit
-bin/satpost payments 20                   recent incoming payments
-bin/satpost sweep <address> <sats> <fee>  send on-chain, after checking the address on your signer
-bin/satpost help                          everything else
+bin/satpost balance                        balance and fee credit
+bin/satpost payments 20                    recent incoming payments
+bin/satpost pay <invoice>                  pay a Lightning invoice
+bin/satpost pay <user@domain> <sats>       pay a Lightning address
+bin/satpost sweep <address> <sats> <fee>   send on-chain; check the address on your signer first
+bin/satpost help                           everything else
 ```
 
 [docs/operations.md](docs/operations.md) covers sweeping, liquidity, updates, backups and
