@@ -29,7 +29,8 @@ services:
     # The image binds the API to 0.0.0.0, which inside this namespace includes the
     # container's bridge address, reachable from every process on the host.
     entrypoint: [/phoenix/phoenixd, --agree-to-terms-of-service, --http-bind-ip, 127.0.0.1]
-    command: [--chain, '${PHOENIXD_CHAIN:-mainnet}', --auto-liquidity, '${PHOENIXD_AUTO_LIQUIDITY:-2m}']
+    command:
+      [--chain, '${PHOENIXD_CHAIN:-mainnet}', --auto-liquidity, '${PHOENIXD_AUTO_LIQUIDITY:-2m}']
     volumes:
       - phoenixd-data:/phoenix/.phoenix
     restart: unless-stopped

@@ -6,11 +6,11 @@ you use it through `satpost` over SSH.
 
 ## What can reach what
 
-| Exposure | What | If it's compromised |
-|---|---|---|
-| Internet (Funnel) | `/.well-known/lnurlp/` and `/lnurlp/api/v1/lnurl/cb/` on port 443, answered by LNbits | invoice spam, your payment history readable, and new payments redirected to someone else's invoices until you notice. No spending |
-| Tailnet, by policy | LNbits admin on 8443 (its login plus two-factor); phoenixd's API on 9740, for a dashboard you allow | needs one of your devices plus the app's credentials |
-| Host only | phoenixd's full-access password and the seed, in phoenixd's volume | needs root on the host, or a user in the docker group |
+| Exposure           | What                                                                                                | If it's compromised                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Internet (Funnel)  | `/.well-known/lnurlp/` and `/lnurlp/api/v1/lnurl/cb/` on port 443, answered by LNbits               | invoice spam, your payment history readable, and new payments redirected to someone else's invoices until you notice. No spending |
+| Tailnet, by policy | LNbits admin on 8443 (its login plus two-factor); phoenixd's API on 9740, for a dashboard you allow | needs one of your devices plus the app's credentials                                                                              |
+| Host only          | phoenixd's full-access password and the seed, in phoenixd's volume                                  | needs root on the host, or a user in the docker group                                                                             |
 
 Nothing is published on the host. phoenixd and LNbits bind `127.0.0.1` inside the shared
 namespace, so other users of the machine can't connect to them through the container's bridge
@@ -30,9 +30,8 @@ directory.
 
 ## Your tailnet policy is required
 
-The Tailscale container runs in userspace mode, which forwards tailnet connections for *any*
-port that serve doesn't handle to that port in the namespace, such as LNbits' plain HTTP port
-5000. Binding loopback keeps the services off the host, not off the tailnet. Only your policy decides which
+The Tailscale container runs in userspace mode, which forwards tailnet connections for _any_
+port that serve doesn't handle to that port in the namespace, such as LNbits' plain HTTP port 5000. Binding loopback keeps the services off the host, not off the tailnet. Only your policy decides which
 devices reach which ports, so no rule may reach `tag:pay` except the ones below. A policy that
 allows everything to everything has to narrow first, for example to `autogroup:self`, which
 covers your own devices but not tagged ones.
@@ -60,15 +59,15 @@ people or automated accounts use your devices.
 
 ## Where the secrets live
 
-| Secret | Where | Backup |
-|---|---|---|
-| phoenixd seed | phoenixd volume, `seed.dat` | 12 words on paper, offline. Never in cloud backups |
-| phoenixd full-access password | phoenixd volume, `phoenix.conf` | none needed; regenerated if lost |
-| phoenixd receive-only password | phoenixd volume, `.env`, LNbits' database | none needed |
-| LNbits first-install token, auth secret | `.env` | none needed |
-| LNbits admin login and two-factor | your password manager | yes |
-| Zap signing key | LNbits' database | optional; a new one only needs the address file refreshed |
-| Tailscale auth key | `.env`; single-use, so spent after the first login | none needed |
+| Secret                                  | Where                                              | Backup                                                    |
+| --------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
+| phoenixd seed                           | phoenixd volume, `seed.dat`                        | 12 words on paper, offline. Never in cloud backups        |
+| phoenixd full-access password           | phoenixd volume, `phoenix.conf`                    | none needed; regenerated if lost                          |
+| phoenixd receive-only password          | phoenixd volume, `.env`, LNbits' database          | none needed                                               |
+| LNbits first-install token, auth secret | `.env`                                             | none needed                                               |
+| LNbits admin login and two-factor       | your password manager                              | yes                                                       |
+| Zap signing key                         | LNbits' database                                   | optional; a new one only needs the address file refreshed |
+| Tailscale auth key                      | `.env`; single-use, so spent after the first login | none needed                                               |
 
 `satpost` never puts a secret on a command line, where every user on the host could read
 it; values go to `.env` through shell builtins only. LNbits prints the first-install token to
