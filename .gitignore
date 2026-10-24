@@ -1,0 +1,4 @@
+# Your instance: settings and secrets never enter the repo
+.env
+.env.*
+!.env.example

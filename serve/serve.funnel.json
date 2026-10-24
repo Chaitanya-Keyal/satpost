@@ -1,0 +1,22 @@
+{
+  "TCP": {
+    "443": { "HTTPS": true },
+    "8443": { "HTTPS": true },
+    "9740": { "HTTPS": true }
+  },
+  "Web": {
+    "${TS_CERT_DOMAIN}:443": {
+      "Handlers": {
+        "/.well-known/lnurlp/": { "Proxy": "http://127.0.0.1:5000/.well-known/lnurlp" },
+        "/lnurlp/api/v1/lnurl/cb/": { "Proxy": "http://127.0.0.1:5000/lnurlp/api/v1/lnurl/cb" }
+      }
+    },
+    "${TS_CERT_DOMAIN}:8443": {
+      "Handlers": { "/": { "Proxy": "http://127.0.0.1:5000" } }
+    },
+    "${TS_CERT_DOMAIN}:9740": {
+      "Handlers": { "/": { "Proxy": "http://127.0.0.1:9740" } }
+    }
+  },
+  "AllowFunnel": { "${TS_CERT_DOMAIN}:443": true }
+}

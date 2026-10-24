@@ -1,0 +1,53 @@
+# Copy to .github/workflows/ in the repo that publishes your Lightning address file, along
+# with sync.mjs (here as scripts/lnaddress-sync.mjs), and fill in the env block.
+#
+# A push made with GITHUB_TOKEN doesn't start other workflows, so if your site deploys from
+# a workflow, set DEPLOY_WORKFLOW to dispatch it. If Pages publishes straight from a branch,
+# such a push doesn't rebuild the site either: switch Pages to deploy from Actions.
+name: lnaddress sync
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: lnaddress-sync
+  cancel-in-progress: false
+
+env:
+  LNADDRESS_SOURCE: https://pay.example-tailnet.ts.net/.well-known/lnurlp/alice
+  LNADDRESS_TARGET: static/.well-known/lnurlp/alice
+  LNADDRESS_IDENTIFIER: alice@example.com
+  LNADDRESS_CALLBACK_HOST: pay.example-tailnet.ts.net
+  DEPLOY_WORKFLOW: deploy.yml
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: sync
+        run: node scripts/lnaddress-sync.mjs
+      - name: commit and redeploy
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am 'chore(lnaddress): sync the lightning address file'
+          git pull --rebase
+          git push
+          if [ -n "$DEPLOY_WORKFLOW" ]; then gh workflow run "$DEPLOY_WORKFLOW" --ref "$GITHUB_REF_NAME"; fi
+      - name: keep the schedule enabled
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # GitHub disables a public repo's schedules after 60 days without activity, and this
+        # job only commits when something changed. Re-enabling on every run holds that off.
+        run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/lnaddress-sync.yml/enable"

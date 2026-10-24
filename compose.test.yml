@@ -1,0 +1,20 @@
+# Local testing without Tailscale, on testnet only. Replaces the ts container with one that
+# forwards two localhost ports into the shared namespace, where phoenixd and LNbits still
+# bind 127.0.0.1 exactly as in production. In .env:
+#   COMPOSE_FILE=compose.yml:compose.test.yml
+#   PHOENIXD_CHAIN=testnet
+#   LNBITS_AUTH_HTTPS_ONLY=false
+# phoenixd's API is then on http://127.0.0.1:19740 and LNbits on http://127.0.0.1:15000.
+services:
+  ts:
+    image: alpine/socat
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        socat TCP-LISTEN:19740,fork,reuseaddr TCP:127.0.0.1:9740 &
+        socat TCP-LISTEN:15000,fork,reuseaddr TCP:127.0.0.1:5000 &
+        wait
+    ports:
+      - 127.0.0.1:19740:19740
+      - 127.0.0.1:15000:15000

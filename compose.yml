@@ -1,0 +1,66 @@
+# satpost: a self-hosted Lightning address that only ever receives.
+#
+# All three containers share one network namespace, owned by the Tailscale container:
+#   ts        joins your tailnet as its own device and serves HTTPS (serve/)
+#   phoenixd  the wallet: seed, channel and funds; its API listens on 127.0.0.1 only
+#   lnbits    the Lightning address (LNURLp), comments and zap receipts, holding only
+#             phoenixd's receive-only password
+# Nothing is published on the host. Your settings and secrets live in .env (gitignored);
+# run bin/setup for the first start. See README.md.
+name: satpost
+
+services:
+  ts:
+    image: tailscale/tailscale:${TAILSCALE_VERSION:-stable}
+    hostname: ${TS_HOSTNAME:-pay}
+    environment:
+      TS_HOSTNAME: ${TS_HOSTNAME:-pay}
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - ts-state:/var/lib/tailscale
+      - ./serve/${SATPOST_SERVE:-serve}.json:/config/serve.json:ro
+    restart: unless-stopped
+
+  phoenixd:
+    image: acinq/phoenixd:${PHOENIXD_VERSION:-0.9.3}
+    network_mode: service:ts
+    # The image binds the API to 0.0.0.0, which inside this namespace includes the
+    # container's bridge address, reachable from every process on the host.
+    entrypoint: [/phoenix/phoenixd, --agree-to-terms-of-service, --http-bind-ip, 127.0.0.1]
+    command: [--chain, '${PHOENIXD_CHAIN:-mainnet}', --auto-liquidity, '${PHOENIXD_AUTO_LIQUIDITY:-2m}']
+    volumes:
+      - phoenixd-data:/phoenix/.phoenix
+    restart: unless-stopped
+    depends_on: [ts]
+
+  lnbits:
+    image: lnbits/lnbits:${LNBITS_VERSION:-v1.6.2}
+    network_mode: service:ts
+    environment:
+      LNBITS_HOST: 127.0.0.1
+      LNBITS_PORT: '5000'
+      LNBITS_DATA_FOLDER: /app/data
+      LNBITS_ADMIN_UI: 'true'
+      FIRST_INSTALL_TOKEN: ${LNBITS_FIRST_INSTALL_TOKEN:-}
+      AUTH_SECRET_KEY: ${LNBITS_AUTH_SECRET_KEY:-}
+      AUTH_ALLOWED_METHODS: username-password
+      AUTH_HTTPS_ONLY: ${LNBITS_AUTH_HTTPS_ONLY:-true}
+      LNBITS_ALLOW_NEW_ACCOUNTS: 'false'
+      LNBITS_BACKEND_WALLET_CLASS: PhoenixdWallet
+      LNBITS_ALLOWED_FUNDING_SOURCES: PhoenixdWallet
+      PHOENIXD_API_ENDPOINT: http://127.0.0.1:9740/
+      # Receive-only: phoenixd refuses every payment made with this password. Never give
+      # LNbits PHOENIXD_DATA_DIR either; it would read the seed from there.
+      PHOENIXD_API_PASSWORD: ${PHOENIXD_LIMITED_PASSWORD:-}
+      LNBITS_EXTENSIONS_DEFAULT_INSTALL: lnurlp
+    volumes:
+      - lnbits-data:/app/data
+    restart: unless-stopped
+    depends_on: [phoenixd]
+
+volumes:
+  ts-state:
+  phoenixd-data:
+  lnbits-data:
