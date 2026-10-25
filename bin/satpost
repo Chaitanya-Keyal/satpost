@@ -110,6 +110,27 @@ Next, in order (README.md has the details):
 EOF
 }
 
+bip39_valid() { # words from the BIP39 English list, with a matching checksum; builtins only
+  local wordlist=$root/lib/bip39-english.txt word idx b i=0 n=0 bits= hex= byte k
+  local -A index=()
+  while IFS= read -r word; do index[$word]=$i; i=$((i + 1)); done <"$wordlist"
+  for word in "$@"; do
+    n=$((n + 1))
+    # The position, not the word: a typo can be close enough to give a word away.
+    [ -n "${index[$word]+x}" ] || { echo "Word $n isn't on the BIP39 word list." >&2; return 1; }
+    idx=${index[$word]}
+    for ((b = 10; b >= 0; b--)); do bits+=$(((idx >> b) & 1)); done
+  done
+  local ent=$((${#bits} * 32 / 33))
+  for ((k = 0; k < ent; k += 8)); do printf -v byte '%02x' "$((2#${bits:k:8}))"; hex+=$byte; done
+  local digest first want= got=${bits:ent}
+  # sha256sum reads the entropy on stdin, so it never appears in a process list.
+  digest=$(for ((k = 0; k < ${#hex}; k += 2)); do printf "\\x${hex:k:2}"; done | sha256sum)
+  first=$((16#${digest:0:2}))
+  for ((b = 7; b >= 0; b--)); do want+=$(((first >> b) & 1)); done
+  [ "${want:0:${#got}}" = "$got" ] || { echo "The words don't form a valid seed (checksum mismatch)." >&2; return 1; }
+}
+
 brand_new() { # phoenixd answers, and has no channel and nothing in any balance or fee credit
   local channels balance
   channels=$(cli listchannels 2>/dev/null) || return 1
@@ -131,20 +152,29 @@ restore() {
       echo "A wallet that has never had a channel or funds can take another seed with --replace." >&2
       exit 1
     fi
-    if ! brand_new; then
+    # A seed that never started a wallet has no database yet, e.g. one phoenixd rejected.
+    if dc run --rm --no-deps -T --entrypoint sh phoenixd -c 'ls /phoenix/.phoenix/phoenix.*.db' \
+      </dev/null >/dev/null 2>&1 && ! brand_new; then
       echo "Refusing to replace the seed: phoenixd isn't running, or this wallet has a channel," >&2
       echo "a balance or fee credit. Replacing it would strand those funds." >&2
       exit 1
     fi
   fi
-  local words word list
+  local words again word list check
   if [ -t 0 ]; then
     read -r -s -p "Type the 12 words separated by spaces, then Enter (nothing is shown): " words
     echo
+    read -r -s -p "Type them again to check: " again
+    echo
+    read -r -a check <<<"$again"
   else
     words=$(cat)
   fi
   read -r -a list <<<"${words//$'\n'/ }"
+  if [ -t 0 ] && [ "${list[*]}" != "${check[*]}" ]; then
+    echo "The two entries don't match. Nothing was changed." >&2
+    exit 1
+  fi
   for word in "${list[@]}"; do
     [[ $word =~ ^[a-z]+$ ]] || { echo "Words are lowercase letters only." >&2; exit 1; }
   done
@@ -152,6 +182,7 @@ restore() {
     echo "Expected 12 or 24 words, got ${#list[@]}." >&2
     exit 1
   fi
+  bip39_valid "${list[@]}" || { echo "Nothing was changed." >&2; exit 1; }
   if [ -n "$replace" ]; then
     # The old wallet's database is named after its node, so it goes with the old seed.
     # phoenix.conf stays, and with it the passwords LNbits and any dashboard use.
