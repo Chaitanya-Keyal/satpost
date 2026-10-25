@@ -9,22 +9,31 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+start_dir=$PWD # where relative paths given on the command line start from
 # Compose resolves a relative COMPOSE_FILE against the working directory, not the project.
 cd "$root"
 env_file=$root/.env
 
-envvar() { # NAME from the environment, else the last NAME=value in .env
+envvar() { # NAME from the environment, else the last NAME=value in .env, read the way compose does
   local line value=${!1:-}
   if [ -z "$value" ] && [ -f "$env_file" ]; then
     while IFS= read -r line || [ -n "$line" ]; do
       [[ $line == "$1="* ]] && value=${line#*=}
     done <"$env_file"
+    case $value in
+      \"*\"*) value=${value#\"} && value=${value%%\"*} ;;
+      \'*\'*) value=${value#\'} && value=${value%%\'*} ;;
+      *) # unquoted: a # after whitespace starts a comment, and trailing whitespace goes
+        value=${value%%[[:space:]]#*}
+        value=${value%"${value##*[![:space:]]}"}
+        ;;
+    esac
   fi
   printf '%s' "$value"
 }
 
-setvar() { # replace NAME=... in .env, or append it
-  local name=$1 value=$2 line found= lines=()
+setvar() { # replace NAME=... in .env, or append it; the new file replaces the old one in one step
+  local name=$1 value=$2 line found= lines=() tmp
   while IFS= read -r line || [ -n "$line" ]; do
     if [[ $line == "$name="* ]]; then
       lines+=("$name=$value")
@@ -34,7 +43,9 @@ setvar() { # replace NAME=... in .env, or append it
     fi
   done <"$env_file"
   [ -n "$found" ] || lines+=("$name=$value")
-  printf '%s\n' "${lines[@]}" >"$env_file"
+  tmp=$(mktemp "$env_file.XXXXXX")
+  printf '%s\n' "${lines[@]}" >"$tmp"
+  mv -f "$tmp" "$env_file"
 }
 
 read -r -a docker <<<"$(envvar SATPOST_DOCKER)"
@@ -42,6 +53,21 @@ read -r -a docker <<<"$(envvar SATPOST_DOCKER)"
 dc() { "${docker[@]}" compose --project-directory "$root" "$@"; }
 # phoenix-cli never reads stdin; without </dev/null docker would swallow piped input.
 cli() { dc exec -T phoenixd /phoenix/phoenix-cli "$@" </dev/null; }
+
+volume_has() { # yes or no: anything matching the pattern in the service's volume? fails if unsure
+  local answer script="for f in $2; do [ -e \"\$f\" ] && { echo yes; exit; }; done; echo no"
+  answer=$(dc run --rm --no-deps -T --entrypoint sh "$1" -c "$script" </dev/null 2>/dev/null) ||
+    answer=
+  if [[ $answer != yes && $answer != no ]]; then
+    echo "Couldn't look inside the $1 volume." >&2
+    return 1
+  fi
+  printf '%s' "$answer"
+}
+
+high_feerate() { # a warning when a feerate looks like a typo
+  (($1 <= 100)) || echo "$1 sat/vB is very high. Check current fees before you confirm."
+}
 
 confirm() {
   local answer
@@ -58,21 +84,28 @@ setup() {
   fi
   chmod 600 "$env_file"
 
-  local random
+  echo "Starting tailscale and phoenixd..."
+  dc up -d ts phoenixd
+
+  local random installed
   if [ -z "$(envvar LNBITS_FIRST_INSTALL_TOKEN)" ]; then
-    random=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
-    setvar LNBITS_FIRST_INSTALL_TOKEN "$random"
+    # LNbits takes a changed token as a request to reset its admin settings, so an install
+    # that has already started never gets a new one from here.
+    installed=$(volume_has lnbits /app/data/database.sqlite3) || exit 1
+    if [ "$installed" = yes ]; then
+      echo "LNbits is already installed, so LNBITS_FIRST_INSTALL_TOKEN stays empty." >&2
+    else
+      random=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
+      setvar LNBITS_FIRST_INSTALL_TOKEN "$random"
+    fi
   fi
   if [ -z "$(envvar LNBITS_AUTH_SECRET_KEY)" ]; then
     random=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
     setvar LNBITS_AUTH_SECRET_KEY "$random"
   fi
 
-  echo "Starting tailscale and phoenixd..."
-  dc up -d ts phoenixd
-
   # phoenixd writes its passwords to phoenix.conf on first start.
-  local password=
+  local password= previous
   for _ in $(seq 60); do
     password=$(cli_conf http-password-limited-access)
     [ -n "$password" ] && break
@@ -82,8 +115,13 @@ setup() {
     echo "phoenixd hasn't written its passwords. Check: ${docker[*]} compose logs phoenixd" >&2
     exit 1
   fi
-  if [ "$(envvar PHOENIXD_LIMITED_PASSWORD)" != "$password" ]; then
+  previous=$(envvar PHOENIXD_LIMITED_PASSWORD)
+  if [ "$previous" != "$password" ]; then
     setvar PHOENIXD_LIMITED_PASSWORD "$password"
+    if [ -n "$previous" ]; then
+      echo "phoenixd's receive-only password changed. An installed LNbits keeps its own copy in" >&2
+      echo "its database: update it in LNbits' admin, under the funding source settings." >&2
+    fi
   fi
 
   echo "Starting lnbits..."
@@ -91,8 +129,11 @@ setup() {
   # On its first start LNbits installs the LNURLp extension but only loads it after a
   # restart, so wait for that start to finish and restart it once.
   if ! dc exec -T lnbits test -f /app/data/.satpost-extensions-loaded 2>/dev/null; then
+    local logs
     for _ in $(seq 90); do
-      dc logs lnbits 2>/dev/null | grep -q 'Application startup complete' && break
+      # Read the whole log first: grep -q closing a pipe early would fail it under pipefail.
+      logs=$(dc logs lnbits 2>/dev/null) || true
+      [[ $logs == *'Application startup complete'* ]] && break
       sleep 2
     done
     dc restart lnbits >/dev/null
@@ -131,38 +172,45 @@ bip39_valid() { # words from the BIP39 English list, with a matching checksum; b
   [ "${want:0:${#got}}" = "$got" ] || { echo "The words don't form a valid seed (checksum mismatch)." >&2; return 1; }
 }
 
-brand_new() { # phoenixd answers, and has no channel and nothing in any balance or fee credit
-  local channels balance
+never_used() { # phoenixd answers, holds nothing, and has never received or sent a payment
+  # A closed channel's funds sit in a wallet getbalance doesn't report, and fee credit reads 0
+  # until ACINQ resends it after a restart, so a wallet that has seen any payment has had funds.
+  local channels balance incoming outgoing empty='^[[:space:]]*\[[[:space:]]*\][[:space:]]*$'
   channels=$(cli listchannels 2>/dev/null) || return 1
   balance=$(cli getbalance 2>/dev/null) || return 1
-  [[ $channels =~ ^[[:space:]]*\[[[:space:]]*\][[:space:]]*$ ]] || return 1
+  incoming=$(cli listincomingpayments --limit 1 2>/dev/null) || return 1
+  outgoing=$(cli listoutgoingpayments --limit 1 --all true 2>/dev/null) || return 1
+  [[ $channels =~ $empty && $incoming =~ $empty && $outgoing =~ $empty ]] || return 1
   [[ $balance == *'"balanceSat"'* ]] || return 1
   [[ ! $balance =~ \"[A-Za-z]*Sat\":[[:space:]]*[1-9] ]]
 }
 
+refuse_replace() {
+  echo "Refusing to replace the seed: phoenixd isn't running, or this wallet has a channel," >&2
+  echo "funds, fee credit or payment history. Replacing it could strand funds." >&2
+  exit 1
+}
+
 restore() {
   [ -f "$env_file" ] || { echo "Run setup first to create .env." >&2; exit 1; }
-  local replace=
+  local replace= seed db=no
   [ "${1:-}" = --replace ] && replace=1
   # One-off phoenixd containers join the ts container's namespace, so it has to be up.
   dc up -d ts </dev/null >/dev/null
-  if dc run --rm --no-deps -T --entrypoint test phoenixd -f /phoenix/.phoenix/seed.dat </dev/null 2>/dev/null; then
+  seed=$(volume_has phoenixd /phoenix/.phoenix/seed.dat) || exit 1
+  if [ "$seed" = yes ]; then
     if [ -z "$replace" ]; then
       echo "This wallet already has a seed; refusing to overwrite it." >&2
-      echo "A wallet that has never had a channel or funds can take another seed with --replace." >&2
+      echo "A wallet that has never had funds or payments can take another seed with --replace." >&2
       exit 1
     fi
     # A seed that never started a wallet has no database yet, e.g. one phoenixd rejected.
-    if dc run --rm --no-deps -T --entrypoint sh phoenixd -c 'ls /phoenix/.phoenix/phoenix.*.db' \
-      </dev/null >/dev/null 2>&1 && ! brand_new; then
-      echo "Refusing to replace the seed: phoenixd isn't running, or this wallet has a channel," >&2
-      echo "a balance or fee credit. Replacing it would strand those funds." >&2
-      exit 1
-    fi
+    db=$(volume_has phoenixd '/phoenix/.phoenix/phoenix.*.db') || exit 1
+    if [ "$db" = yes ] && ! never_used; then refuse_replace; fi
   fi
   local words again word list check
   if [ -t 0 ]; then
-    read -r -s -p "Type the 12 words separated by spaces, then Enter (nothing is shown): " words
+    read -r -s -p "Type the words separated by spaces, then Enter (nothing is shown): " words
     echo
     read -r -s -p "Type them again to check: " again
     echo
@@ -183,15 +231,21 @@ restore() {
     exit 1
   fi
   bip39_valid "${list[@]}" || { echo "Nothing was changed." >&2; exit 1; }
-  if [ -n "$replace" ]; then
+  if [ "$seed" = yes ]; then
+    # Check again: a payment could have arrived while the words were being typed.
+    if [ "$db" = yes ] && ! never_used; then refuse_replace; fi
     # The old wallet's database is named after its node, so it goes with the old seed.
     # phoenix.conf stays, and with it the passwords LNbits and any dashboard use.
     dc stop phoenixd </dev/null >/dev/null
     dc run --rm --no-deps -T --entrypoint sh phoenixd -c \
       'rm -f /phoenix/.phoenix/seed.dat /phoenix/.phoenix/phoenix.*.db /phoenix/.phoenix/phoenix.*.db-*' </dev/null
   fi
-  printf '%s\n' "${list[*]}" |
-    dc run --rm --no-deps -T --entrypoint sh phoenixd -c 'umask 077; cat >/phoenix/.phoenix/seed.dat'
+  # set -C: never overwrite a seed, even one that appeared since the check above.
+  if ! printf '%s\n' "${list[*]}" | dc run --rm --no-deps -T --entrypoint sh phoenixd -c \
+    'set -C; umask 077; cat >/phoenix/.phoenix/seed.dat'; then
+    echo "Couldn't write the seed; phoenixd's volume may already have one. Run restore again." >&2
+    exit 1
+  fi
   echo "Seed written. Now run: satpost setup"
 }
 
@@ -202,7 +256,7 @@ seed() {
     echo "satpost seed only runs in an interactive terminal." >&2
     exit 1
   fi
-  echo "This shows the 12 words that control your funds. Make sure nobody can see your screen."
+  echo "This shows the words that control your funds. Make sure nobody can see your screen."
   confirm show
   dc exec -T phoenixd cat /phoenix/.phoenix/seed.dat </dev/null
   printf '\n\nWrite them on paper, then clear the screen and your scrollback.\n'
@@ -210,34 +264,46 @@ seed() {
 
 export_history() {
   [ $# -eq 1 ] || { usage >&2; exit 2; }
-  local out path
+  local out path= dest=$1
+  [[ $dest == /* ]] || dest=$start_dir/$dest
   out=$(cli exportcsv)
-  path=$(printf '%s\n' "$out" | grep -o '/phoenix/[^ ]*\.csv' | head -1)
+  [[ $out =~ (/phoenix/[^[:space:]]*\.csv) ]] && path=${BASH_REMATCH[1]}
   [ -n "$path" ] || { echo "phoenixd didn't report an export file: $out" >&2; exit 1; }
-  dc exec -T phoenixd cat "$path" </dev/null >"$1"
+  # Payment history is private: only you can read the file.
+  (umask 077 && dc exec -T phoenixd cat "$path" </dev/null >"$dest")
+  chmod 600 "$dest"
   dc exec -T phoenixd rm -f "$path" </dev/null
-  echo "Wrote the payment history to $1"
+  echo "Wrote the payment history to $dest"
 }
 
 cli_conf() { # read one key from phoenixd's phoenix.conf; prints nothing if unavailable
   dc exec -T phoenixd sed -n "s/^$1=//p" /phoenix/.phoenix/phoenix.conf </dev/null 2>/dev/null || true
 }
 
-liquidity_sats() {
+liquidity_sats() { # what PHOENIXD_AUTO_LIQUIDITY buys, 0 when off; same default as compose.yml
   case $(envvar PHOENIXD_AUTO_LIQUIDITY) in
+    '' | 2m) echo 2000000 ;;
     5m) echo 5000000 ;;
     10m) echo 10000000 ;;
-    *) echo 2000000 ;;
+    off) echo 0 ;;
+    *) echo "PHOENIXD_AUTO_LIQUIDITY must be off, 2m, 5m or 10m." >&2 && return 1 ;;
   esac
 }
 
 fees() {
-  # phoenixd's estimate prices mining at today's feerate. With no coins of its own in the funding
-  # transaction, lightning-kmp opens the first channel at up to 2.5 times that feerate, and keeps a
-  # payment as fee credit if it doesn't exceed the fee at up to 3.8 times.
-  local amount=${1:-0} liquidity estimate channels fee mining= service=
+  # Estimates: phoenixd's estimate prices mining at electrum's feerate, while the purchase uses
+  # ACINQ's. With no coins of its own in the funding transaction, lightning-kmp opens the first
+  # channel at up to 2.5 times the feerate, and keeps a payment as fee credit if it doesn't
+  # exceed the fee at up to 3.8 times. phoenixd also refuses a purchase whose mining fee is over
+  # its limit, 1% of the block by default.
+  local amount=${1:-0} block liquidity estimate channels fee mining= service=
   [[ $amount =~ ^(0|[1-9][0-9]*)$ ]] || { usage >&2; exit 2; }
-  liquidity=$(($(liquidity_sats) + amount))
+  block=$(liquidity_sats) || exit 1
+  if ((block == 0)); then
+    echo "Auto-liquidity is off, so phoenixd refuses any payment that doesn't fit your channel."
+    return
+  fi
+  liquidity=$((block + amount))
   estimate=$(cli estimateliquidityfees --amountSat "$liquidity")
   [[ $estimate =~ \"miningFeeSat\":[[:space:]]*([0-9]+) ]] && mining=${BASH_REMATCH[1]}
   [[ $estimate =~ \"serviceFeeSat\":[[:space:]]*([0-9]+) ]] && service=${BASH_REMATCH[1]}
@@ -247,14 +313,19 @@ fees() {
     fee=$((service + mining))
     echo "A payment that doesn't fit your channel buys $liquidity sats of liquidity for about $fee"
     echo "sats ($service service, $mining mining), plus your share of the splice's mining fee."
+  else
+    fee=$((service + (mining * 5 + 1) / 2))
+    echo "Opening your first channel buys $liquidity sats of liquidity for about $fee sats"
+    echo "($service service, about $((fee - service)) mining)."
+  fi
+  if ((mining > block / 100)); then
+    echo "At today's feerate the mining fee is over phoenixd's limit of 1% of the block, so it"
+    echo "would refuse a payment that needs liquidity. Wait for lower fees."
     return
   fi
-  fee=$((service + (mining * 5 + 1) / 2))
-  echo "Opening your first channel buys $liquidity sats of liquidity for up to $fee sats"
-  echo "($service service, up to $((fee - service)) mining)."
-  ((amount > 0)) || return 0
+  [[ $channels =~ ^[[:space:]]*\[[[:space:]]*\][[:space:]]*$ ]] && ((amount > 0)) || return 0
   if ((amount > service + (mining * 38 + 9) / 10)); then
-    echo "A payment of $amount sats opens it, and you keep at least $((amount - fee))."
+    echo "A payment of $amount sats should open it, and you'd keep about $((amount - fee))."
   else
     echo "A payment of $amount sats may be too small to open it: phoenixd would keep it as fee"
     echo "credit, which is non-refundable."
@@ -267,7 +338,7 @@ usage: satpost <command>
 
   setup                                first start; safe to re-run
   restore [--replace]                  put your own seed in place: before the first setup, or with
-                                       --replace on a wallet that has never had a channel or funds
+                                       --replace on a wallet that has never had funds or payments
   seed                                 show the seed, to write it down (interactive only)
   up                                   apply changes to .env, e.g. SATPOST_SERVE
   update                               pull the versions set in .env and restart
@@ -276,8 +347,8 @@ usage: satpost <command>
   balance                              balance and fee credit, in sats
   channels                             channel capacity and inbound liquidity
   payments [n]                         the last n incoming payments (default 10)
-  fees [sats]                          fee for the liquidity an incoming payment of [sats] would
-                                       buy, and whether it's enough to open your first channel
+  fees [sats]                          estimated fee for the liquidity an incoming payment of
+                                       [sats] would buy, and whether it opens your first channel
   invoice <sats> [description]         create an invoice, e.g. to fund the channel
   export <file.csv>                    save the payment history (records, not a wallet backup)
   pay <invoice>                        pay a Lightning invoice
@@ -305,13 +376,13 @@ case $cmd in
   fees) fees "$@" ;;
   export) export_history "$@" ;;
   invoice)
-    [ $# -ge 1 ] || { usage >&2; exit 2; }
+    [[ $# -ge 1 && $1 =~ ^[1-9][0-9]*$ ]] || { usage >&2; exit 2; }
     cli createinvoice --amountSat "$1" --description "${2:-satpost}"
     ;;
   pay)
     [ $# -ge 1 ] || { usage >&2; exit 2; }
     if [[ $1 == *@* ]]; then
-      [ $# -ge 2 ] || { usage >&2; exit 2; }
+      [[ $# -ge 2 && $2 =~ ^[1-9][0-9]*$ ]] || { usage >&2; exit 2; }
       echo "Paying $2 sats to $1"
       confirm pay
       if [ $# -ge 3 ]; then
@@ -326,10 +397,11 @@ case $cmd in
     fi
     ;;
   sweep)
-    [ $# -eq 3 ] || { usage >&2; exit 2; }
+    [[ $# -eq 3 && $2 =~ ^[1-9][0-9]*$ && $3 =~ ^[1-9][0-9]*$ ]] || { usage >&2; exit 2; }
     printf 'Sending %s sats on-chain at %s sat/vB to:\n\n    ' "$2" "$3"
     printf '%s\n' "$1" | fold -w4 | paste -sd' ' -
     printf '\nCompare every group with the address shown on your signing device.\n'
+    high_feerate "$3"
     confirm send
     cli sendtoaddress --address "$1" --amountSat "$2" --feerateSatByte "$3"
     ;;
@@ -337,6 +409,7 @@ case $cmd in
     [[ $# -eq 1 && $1 =~ ^[1-9][0-9]*$ ]] || { usage >&2; exit 2; }
     echo "Bumping the channel's unconfirmed transaction to $1 sat/vB. The extra mining fee comes"
     echo "out of your balance."
+    high_feerate "$1"
     confirm bump
     cli bumpfee --feerateSatByte "$1"
     ;;
