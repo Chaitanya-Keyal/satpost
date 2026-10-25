@@ -9,6 +9,13 @@
 # run bin/satpost setup for the first start. See README.md.
 name: satpost
 
+# Docker keeps container logs forever unless told otherwise.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
 services:
   ts:
     image: tailscale/tailscale:${TAILSCALE_VERSION:-v1.104.2}
@@ -22,6 +29,7 @@ services:
       - ts-state:/var/lib/tailscale
       - ./serve/${SATPOST_SERVE:-serve}.json:/config/serve.json:ro
     restart: unless-stopped
+    logging: *logging
 
   phoenixd:
     image: acinq/phoenixd:${PHOENIXD_VERSION:-0.9.3}
@@ -34,6 +42,7 @@ services:
     volumes:
       - phoenixd-data:/phoenix/.phoenix
     restart: unless-stopped
+    logging: *logging
     depends_on: [ts]
 
   lnbits:
@@ -59,6 +68,7 @@ services:
     volumes:
       - lnbits-data:/app/data
     restart: unless-stopped
+    logging: *logging
     depends_on: [phoenixd]
 
 volumes:
