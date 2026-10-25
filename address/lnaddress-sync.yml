@@ -24,6 +24,10 @@ env:
   LNADDRESS_TARGET: static/.well-known/lnurlp/alice
   LNADDRESS_IDENTIFIER: alice@example.com
   LNADDRESS_CALLBACK_HOST: pay.example-tailnet.ts.net
+  # Optional: the zap key the response must keep (hex), and the live URL that must serve the
+  # file once it's current. Leave either empty to skip that check.
+  LNADDRESS_NOSTR_PUBKEY: ''
+  LNADDRESS_PUBLISHED_URL: https://example.com/.well-known/lnurlp/alice
   DEPLOY_WORKFLOW: deploy.yml
 
 jobs:
