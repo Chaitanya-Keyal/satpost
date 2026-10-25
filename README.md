@@ -85,9 +85,10 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
    public DNS returns.
 8. **Publish the address file.** Save that response byte for byte as
    `https://yourdomain.com/.well-known/lnurlp/<username>`. On GitHub Pages the dot directory needs
-   care: add `.nojekyll` when publishing from a branch, or set `include-hidden-files: true` on
-   `actions/upload-pages-artifact` (v4 and later) when deploying from Actions. [address/](address/) has an hourly workflow that keeps the copy
-   current and alerts you if the live response changes in a way it won't follow.
+   care: add `.nojekyll` when publishing from a branch, or use `actions/upload-pages-artifact`
+   v5 or later with `include-hidden-files: true` when deploying from Actions (v4 always leaves
+   dot directories out). [address/](address/) has an hourly workflow that keeps the copy current
+   and alerts you if the live response changes in a way it won't follow.
 9. **Test** with two different wallets, and check that comments show up in LNbits.
 
 ## Everyday use

@@ -13,8 +13,8 @@ phoenixd's full-access password, and with limits that still hold if the dashboar
 
 A small service in the satpost stack, in the same network namespace as phoenixd. It listens on
 loopback, and serve publishes it to the tailnet on its own port, never through Funnel. It holds
-the full-access password from `.env`; the dashboard only holds a token for the guard. LNbits stays
-receive-only.
+the full-access password, better as a root-owned secret file mounted into its container than in
+`.env`; the dashboard only holds a token for the guard. LNbits stays receive-only.
 
 ## Rules the guard enforces
 

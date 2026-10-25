@@ -85,7 +85,7 @@ default policy also gives all your devices the `funnel` attribute. satpost only 
 
 | Secret                                  | Where                                              | Backup                                                    |
 | --------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
-| phoenixd seed                           | phoenixd volume, `seed.dat`                        | 12 words on paper, offline. Never in cloud backups        |
+| phoenixd seed                           | phoenixd volume, `seed.dat`                        | 12 or 24 words on paper, offline. Never in cloud backups  |
 | phoenixd full-access password           | phoenixd volume, `phoenix.conf`                    | none needed; regenerated if lost                          |
 | phoenixd receive-only password          | phoenixd volume, `.env`, LNbits' database          | none needed                                               |
 | LNbits first-install token, auth secret | `.env`                                             | none needed                                               |
@@ -97,12 +97,25 @@ default policy also gives all your devices the `funnel` attribute. satpost only 
 it; values go to `.env` through shell builtins only. LNbits prints the first-install token to
 its container log on a fresh install, which only root and the docker group can read.
 
+Leave `LNBITS_FIRST_INSTALL_TOKEN` as it is once LNbits is installed: LNbits takes a changed
+token as a request to reset its admin settings, and the next login with the new token becomes
+the admin. `satpost setup` never replaces it on an installed LNbits.
+
+The containers run without Linux capabilities or a way to gain privileges, with memory and
+process limits.
+
 ## Known gaps
 
 - **Redirected payments.** Anyone who takes over the internet-facing path can hand out their
   own invoices. Keep LNbits updated and watch that payments keep arriving. A BIP353 record with
   a BOLT12 offer, signed in DNS, removes the live server from the path; it isn't set up here yet.
-- **Zap request signatures.** LNURLp 1.3.2 checks a zap request's structure but not its
-  signature, so a forged request still gets an invoice. Nostr clients that verify zap receipts
-  discard the result.
+- **Zap requests.** LNURLp 1.3.2 stores the zap request a payer sends without checking it,
+  signature included, and publishes a receipt for it. A forged request still gets an invoice;
+  Nostr clients that verify zap receipts discard the result.
+- **Zap relays.** For every paid zap, LNbits connects to each relay the zap request lists, so
+  those relays learn your server's address, which Funnel otherwise hides. LNURLp 1.3.2 also
+  connects to addresses inside your network: blind requests, and phoenixd's API still wants its
+  password. Turn zaps off on the pay link if that matters to you.
+- Both are fixed in LNURLp's next release (1.4.0): it validates zap requests and refuses
+  non-public addresses. Update it from LNbits' admin page once LNbits offers it.
 - **ACINQ** sees your payments and is your only channel peer.

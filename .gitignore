@@ -2,3 +2,6 @@
 .env
 .env.*
 !.env.example
+# Payment history exports, and local test scratch
+*.csv
+.local/

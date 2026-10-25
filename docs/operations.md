@@ -35,35 +35,42 @@ The sweep is a splice-out: the channel stays open and shrinks, and only the mini
 
 ## Updates
 
-Versions are pinned in `.env`. Read the release notes, change the version, then run
-`satpost update`.
+Versions are pinned in `.env` by tag and digest, so a re-pushed tag can't change what runs.
+Read the release notes, then set the new tag and its digest, which
+`docker buildx imagetools inspect <image>:<tag>` prints as `Digest:`, for example
+`PHOENIXD_VERSION=0.9.4@sha256:…`. Then run `satpost update`.
 
 Watch the [phoenixd](https://github.com/ACINQ/phoenixd/releases) and
 [LNbits](https://github.com/lnbits/lnbits/releases) releases on GitHub (Watch → Custom →
-Releases). Update LNbits promptly: two of its endpoints are public. Extension updates
-are in LNbits' admin page.
+Releases). Update LNbits promptly: two of its endpoints are public. LNbits installs its
+extensions itself, so the LNURLp version isn't pinned by the image; update it from LNbits'
+admin page when LNbits offers a new one.
 
 ## Backups
 
-- **The seed** is the wallet's only backup: 12 words on paper, made during setup. It restores
+- **The seed** is the wallet's only backup: 12 (or 24) words on paper. It restores
   the channel too, because ACINQ keeps an encrypted copy of its latest state.
 - **Never back up phoenixd's database to restore later.** Channel state goes stale with the
   next payment, and restoring an old copy can publish a revoked state, which loses the channel.
 - **Payment history**, for your records: `satpost export history.csv`.
-- **LNbits' data** (the pay link, payer comments, the zap key), if you want it kept. Encrypt it
-  if it leaves the server. From the satpost folder:
+- **LNbits' data** (the pay link, payer comments, the zap key and the receive-only password),
+  if you want it kept. Keep it private and encrypt it if it leaves the server. From the
+  satpost folder:
 
 ```
-docker compose exec -T lnbits tar -C /app/data -cz . > lnbits-data.tar.gz
+(umask 077; docker compose exec -T lnbits tar -C /app/data -cz . > lnbits-data.tar.gz)
 ```
+
+LNbits' own logs, in that data and in `docker compose logs lnbits`, record its wallet page's
+invoice key. Redact them before you share them.
 
 ## Recovering on a new host
 
 1. Repoint your address file at a custodial wallet's Lightning address for the meantime, so
    payments keep arriving.
 2. On the new host, run `satpost setup` once to create `.env` and edit it, then
-   `satpost restore` and type the 12 words (nothing is shown; it refuses to overwrite an
-   existing seed). Then `satpost setup`.
+   `satpost restore` and type the words (nothing is shown; it refuses to overwrite an existing
+   seed). Then `satpost setup`.
 3. phoenixd reconnects to ACINQ and restores the channel and balance from its encrypted backup.
 4. Recreate the LNbits pay link (or restore LNbits' data), then refresh the address file. Its
    callback URL changes with a new pay link.
