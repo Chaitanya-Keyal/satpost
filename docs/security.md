@@ -70,8 +70,12 @@ below. A policy that allows everything to everything has to narrow first, for ex
 }
 ```
 
-Adapt this to your existing policy, with your own login in the tests. Narrow the admin rule to
-your phone and laptop if other people or automated accounts use your devices. Tailscale's
+Adapt this to your existing policy, with your own login in the tests. If the host running
+satpost is itself one of your devices, `autogroup:member` includes it, and so does any shared
+or automated machine you own. Narrow the admin rule to the devices you actually use, with
+`hosts` entries such as `"laptop": "100.64.0.11"` as the source, and pin it with host tests such
+as `{ "src": "laptop", "accept": ["tag:pay:8443"] }` and
+`{ "src": "server", "deny": ["tag:pay:8443"] }`. Tailscale's
 default policy also gives all your devices the `funnel` attribute. satpost only needs it on
 `tag:pay`, so remove the default one unless you use Funnel elsewhere.
 
