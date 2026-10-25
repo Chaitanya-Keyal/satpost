@@ -49,6 +49,15 @@ unlike Tailscale on your own devices, so bump `TAILSCALE_VERSION` when a bulleti
 LNbits installs its extensions itself, so the LNURLp version isn't pinned by the image; update it
 from LNbits' admin page when LNbits offers a new one.
 
+## Restarting
+
+phoenixd and LNbits share the Tailscale container's network namespace, and Docker gives a
+container a new namespace each time it starts. If the Tailscale container restarts on its own,
+after a crash or a `docker restart`, the other two stay in the old one: Docker still shows them
+as up, but nothing reaches them, and phoenixd loses its channel peer. `docker compose restart`
+can leave them the same way. To restart everything, run `docker compose up -d --force-recreate`
+from the satpost folder; `satpost up` only replaces containers whose settings changed.
+
 ## Backups
 
 - **The seed** is the wallet's only backup: 12 (or 24) words on paper. It restores
