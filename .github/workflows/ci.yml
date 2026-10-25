@@ -1,0 +1,29 @@
+# Lints the CLI, and checks formatting and both compose files, on every push and pull request.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: shellcheck
+        run: shellcheck --severity=warning bin/satpost
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+      - name: prettier
+        run: npx --yes prettier@3.9.6 --check .
+      - name: compose files
+        run: |
+          docker compose -f compose.yml config --no-interpolate --quiet
+          docker compose -f compose.yml -f compose.test.yml config --no-interpolate --quiet

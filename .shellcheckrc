@@ -1,0 +1,2 @@
+# `local name= other=` declares empty locals; bin/satpost uses it on purpose.
+disable=SC1007
