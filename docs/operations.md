@@ -40,11 +40,14 @@ Read the release notes, then set the new tag and its digest, which
 `docker buildx imagetools inspect <image>:<tag>` prints as `Digest:`, for example
 `PHOENIXD_VERSION=0.9.4@sha256:…`. Then run `satpost update`.
 
-Watch the [phoenixd](https://github.com/ACINQ/phoenixd/releases) and
-[LNbits](https://github.com/lnbits/lnbits/releases) releases on GitHub (Watch → Custom →
-Releases). Update LNbits promptly: two of its endpoints are public. LNbits installs its
-extensions itself, so the LNURLp version isn't pinned by the image; update it from LNbits'
-admin page when LNbits offers a new one.
+Watch the [phoenixd](https://github.com/ACINQ/phoenixd/releases),
+[LNbits](https://github.com/lnbits/lnbits/releases) and
+[Tailscale](https://github.com/tailscale/tailscale/releases) releases on GitHub (Watch → Custom →
+Releases), and Tailscale's [security bulletins](https://tailscale.com/security-bulletins). Update
+LNbits promptly: two of its endpoints are public. The Tailscale container never updates itself,
+unlike Tailscale on your own devices, so bump `TAILSCALE_VERSION` when a bulletin names it.
+LNbits installs its extensions itself, so the LNURLp version isn't pinned by the image; update it
+from LNbits' admin page when LNbits offers a new one.
 
 ## Backups
 
