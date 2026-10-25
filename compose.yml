@@ -52,8 +52,9 @@ services:
   ts:
     <<: *hardening
     user: '${TS_UID:-10005}:${TS_UID:-10005}'
-    # containerboot links its socket into /var/run/tailscale.
-    tmpfs: [/tmp, /var/run/tailscale]
+    # containerboot links its socket into /var/run/tailscale, where the tailscale CLI looks for it.
+    # Without the mode, a restarted container gets that tmpfs back as root's 755 and the link fails.
+    tmpfs: [/tmp, '/var/run/tailscale:mode=1777']
     mem_limit: 256m
     cpus: 0.25
     image: tailscale/tailscale:${TAILSCALE_VERSION:-v1.104.2}
