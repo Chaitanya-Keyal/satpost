@@ -1,13 +1,17 @@
-# Local testing without Tailscale, on testnet only. Replaces the ts container with one that
+# Local testing without Tailscale, always on testnet. Replaces the ts container with one that
 # forwards two localhost ports into the shared namespace, where phoenixd and LNbits still
 # bind 127.0.0.1 exactly as in production. In .env:
 #   COMPOSE_FILE=compose.yml:compose.test.yml
-#   PHOENIXD_CHAIN=testnet
 #   LNBITS_AUTH_HTTPS_ONLY=false
-# phoenixd's API is then on http://127.0.0.1:19740 and LNbits on http://127.0.0.1:15000.
+# phoenixd's API is then on http://127.0.0.1:19740 and LNbits on http://127.0.0.1:15000. The
+# forwarder also answers on its container address, so other users of the machine can reach
+# both; test on a machine that's only yours.
 services:
   ts:
     image: alpine/socat:1.8.1.3
+    # Nothing of the Tailscale container's settings, auth key included, belongs in here.
+    environment: !reset {}
+    volumes: !reset []
     entrypoint:
       - sh
       - -c
@@ -18,3 +22,7 @@ services:
     ports:
       - 127.0.0.1:19740:19740
       - 127.0.0.1:15000:15000
+
+  phoenixd:
+    # Testnet whatever .env says, so a copied production .env can't put real funds on a test.
+    command: [--chain, testnet, --auto-liquidity, '${PHOENIXD_AUTO_LIQUIDITY:-2m}']

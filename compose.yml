@@ -16,8 +16,17 @@ x-logging: &logging
     max-size: 10m
     max-file: '3'
 
+# None of the containers needs a Linux capability or a way to gain privileges, and the limits
+# keep a runaway process from taking the host down with it.
+x-hardening: &hardening
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  pids_limit: 256
+
 services:
   ts:
+    <<: *hardening
+    mem_limit: 256m
     image: tailscale/tailscale:${TAILSCALE_VERSION:-v1.104.2}
     hostname: ${TS_HOSTNAME:-pay}
     environment:
@@ -34,6 +43,8 @@ services:
     logging: *logging
 
   phoenixd:
+    <<: *hardening
+    mem_limit: 512m
     image: acinq/phoenixd:${PHOENIXD_VERSION:-0.9.3}
     network_mode: service:ts
     # The image binds the API to 0.0.0.0, which inside this namespace includes the
@@ -48,6 +59,8 @@ services:
     depends_on: [ts]
 
   lnbits:
+    <<: *hardening
+    mem_limit: 1g
     image: lnbits/lnbits:${LNBITS_VERSION:-v1.6.2}
     network_mode: service:ts
     environment:
