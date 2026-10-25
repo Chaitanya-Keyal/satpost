@@ -151,6 +151,17 @@ seed() {
   printf '\n\nWrite them on paper, then clear the screen and your scrollback.\n'
 }
 
+export_history() {
+  [ $# -eq 1 ] || { usage >&2; exit 2; }
+  local out path
+  out=$(cli exportcsv)
+  path=$(printf '%s\n' "$out" | grep -o '/phoenix/[^ ]*\.csv' | head -1)
+  [ -n "$path" ] || { echo "phoenixd didn't report an export file: $out" >&2; exit 1; }
+  dc exec -T phoenixd cat "$path" </dev/null >"$1"
+  dc exec -T phoenixd rm -f "$path" </dev/null
+  echo "Wrote the payment history to $1"
+}
+
 cli_conf() { # read one key from phoenixd's phoenix.conf; prints nothing if unavailable
   dc exec -T phoenixd sed -n "s/^$1=//p" /phoenix/.phoenix/phoenix.conf </dev/null 2>/dev/null || true
 }
@@ -180,6 +191,7 @@ usage: satpost <command>
   fees [sats]                          fee for the liquidity purchase an incoming payment of
                                        [sats] would trigger; fund the channel with more than this
   invoice <sats> [description]         create an invoice, e.g. to fund the channel
+  export <file.csv>                    save the payment history (records, not a wallet backup)
   pay <invoice>                        pay a Lightning invoice
   pay <user@domain> <sats> [message]   pay a Lightning address
   sweep <address> <sats> <sat/vB>      send on-chain (a splice-out); check the address on your
@@ -201,6 +213,7 @@ case $cmd in
   channels) cli listchannels ;;
   payments) cli listincomingpayments --limit "${1:-10}" ;;
   fees) cli estimateliquidityfees --amountSat "$(($(liquidity_sats) + ${1:-0}))" ;;
+  export) export_history "$@" ;;
   invoice)
     [ $# -ge 1 ] || { usage >&2; exit 2; }
     cli createinvoice --amountSat "$1" --description "${2:-satpost}"

@@ -37,13 +37,15 @@ are in LNbits' admin page.
 
 ## Backups
 
-- **The seed** is the only thing that protects the money: 12 words on paper, made during setup.
-- **Records** (payment history, payer comments, the pay link, the zap key) live in the
-  `phoenixd-data` and `lnbits-data` volumes. If you want them kept, copy them somewhere safe,
-  leaving out `seed.dat`. From the satpost folder:
+- **The seed** is the wallet's only backup: 12 words on paper, made during setup. It restores
+  the channel too, because ACINQ keeps an encrypted copy of its latest state.
+- **Never back up phoenixd's database to restore later.** Channel state goes stale with the
+  next payment, and restoring an old copy can publish a revoked state, which loses the channel.
+- **Payment history**, for your records: `satpost export history.csv`.
+- **LNbits' data** (the pay link, payer comments, the zap key), if you want it kept. Encrypt it
+  if it leaves the server. From the satpost folder:
 
 ```
-docker compose exec -T phoenixd tar -C /phoenix/.phoenix --exclude=seed.dat -cz . > phoenixd-records.tar.gz
 docker compose exec -T lnbits tar -C /app/data -cz . > lnbits-data.tar.gz
 ```
 
@@ -55,7 +57,7 @@ docker compose exec -T lnbits tar -C /app/data -cz . > lnbits-data.tar.gz
    `satpost restore` and type the 12 words (nothing is shown; it refuses to overwrite an
    existing seed). Then `satpost setup`.
 3. phoenixd reconnects to ACINQ and restores the channel and balance from its encrypted backup.
-4. Recreate the LNbits pay link (or restore `lnbits-data`), then refresh the address file. Its
+4. Recreate the LNbits pay link (or restore LNbits' data), then refresh the address file. Its
    callback URL changes with a new pay link.
 
 Never run the same seed in two places at once: two phoenixd instances, or phoenixd and the
