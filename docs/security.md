@@ -48,8 +48,10 @@ below. A policy that allows everything to everything has to narrow first, for ex
   "grants": [
     // Your own devices keep reaching each other. Tagged devices aren't in autogroup:self.
     { "src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"] },
-    // The LNbits admin page.
-    { "src": ["autogroup:member"], "dst": ["tag:pay"], "ip": ["tcp:8443"] },
+    // The LNbits admin page, and the payment paths on 443. MagicDNS sends your devices to those
+    // over the tailnet rather than Funnel, so without 443 a wallet on your phone can't pay your
+    // own address while Tailscale is on. 443 serves only what the internet already reaches.
+    { "src": ["autogroup:member"], "dst": ["tag:pay"], "ip": ["tcp:8443", "tcp:443"] },
     // Optional: the dashboard. If its device isn't tagged, name it with a hosts entry instead.
     { "src": ["tag:satbook"], "dst": ["tag:pay"], "ip": ["tcp:9740", "tcp:8443"] }
   ],
@@ -58,7 +60,7 @@ below. A policy that allows everything to everything has to narrow first, for ex
   "tests": [
     {
       "src": "you@example.com",
-      "accept": ["tag:pay:8443"],
+      "accept": ["tag:pay:8443", "tag:pay:443"],
       "deny": ["tag:pay:5000", "tag:pay:9740"]
     },
     {

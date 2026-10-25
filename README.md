@@ -79,7 +79,10 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
    another wallet, then check `satpost channels`.
 7. **Open the payment paths.** Set `SATPOST_SERVE=serve.funnel` in `.env` and run
    `satpost up`. From outside your tailnet,
-   `https://<TS_HOSTNAME>.<tailnet>.ts.net/.well-known/lnurlp/<username>` now answers.
+   `https://<TS_HOSTNAME>.<tailnet>.ts.net/.well-known/lnurlp/<username>` now answers, usually
+   within a minute or two. Your own devices resolve that name to its tailnet address, so check
+   from a phone on mobile data with Tailscale off, or with `curl --resolve` and the address
+   public DNS returns.
 8. **Publish the address file.** Save that response byte for byte as
    `https://yourdomain.com/.well-known/lnurlp/<username>`. On GitHub Pages the dot directory needs
    care: add `.nojekyll` when publishing from a branch, or set `include-hidden-files: true` on
