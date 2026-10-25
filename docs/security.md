@@ -101,8 +101,11 @@ Leave `LNBITS_FIRST_INSTALL_TOKEN` as it is once LNbits is installed: LNbits tak
 token as a request to reset its admin settings, and the next login with the new token becomes
 the admin. `satpost setup` never replaces it on an installed LNbits.
 
-The containers run without Linux capabilities or a way to gain privileges, with memory and
-process limits.
+The containers run on read-only filesystems, without Linux capabilities or a way to gain
+privileges, with CPU, memory and process limits. Tailscale and LNbits run as their own users,
+10005 and 10004 by default (`TS_UID`, `LNBITS_UID`), which shouldn't exist on the host, and
+phoenixd as its image's own user. A one-shot `owners` container hands their volumes to those
+users on every start, so a restored backup gets the right owner too.
 
 ## Known gaps
 
