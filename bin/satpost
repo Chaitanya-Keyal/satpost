@@ -284,6 +284,8 @@ usage: satpost <command>
   pay <user@domain> <sats> [message]   pay a Lightning address
   sweep <address> <sats> <sat/vB>      send on-chain (a splice-out); check the address on your
                                        signing device first
+  bumpfee <sat/vB>                     speed up a stuck sweep; the extra mining fee comes out of
+                                       your balance
 EOF
 }
 
@@ -330,6 +332,13 @@ case $cmd in
     printf '\nCompare every group with the address shown on your signing device.\n'
     confirm send
     cli sendtoaddress --address "$1" --amountSat "$2" --feerateSatByte "$3"
+    ;;
+  bumpfee)
+    [[ $# -eq 1 && $1 =~ ^[1-9][0-9]*$ ]] || { usage >&2; exit 2; }
+    echo "Bumping the channel's unconfirmed transaction to $1 sat/vB. The extra mining fee comes"
+    echo "out of your balance."
+    confirm bump
+    cli bumpfee --feerateSatByte "$1"
     ;;
   help | -h | --help) usage ;;
   *)

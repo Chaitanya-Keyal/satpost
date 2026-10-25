@@ -98,6 +98,7 @@ satpost payments 20                    recent incoming payments
 satpost pay <invoice>                  pay a Lightning invoice
 satpost pay <user@domain> <sats>       pay a Lightning address
 satpost sweep <address> <sats> <fee>   send on-chain; check the address on your signer first
+satpost bumpfee <sat/vB>               speed up a stuck sweep
 satpost help                           everything else
 ```
 

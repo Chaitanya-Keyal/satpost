@@ -14,6 +14,14 @@ Every command below runs on the host. `satpost` finds its own folder, so once it
 
 The sweep is a splice-out: the channel stays open and shrinks, and only the mining fee is paid.
 
+- The fee comes out of your balance and phoenixd can't quote it in advance, so leave a little
+  behind: about 1,000 sats at a few sat/vB. If phoenixd answers with an insufficient-funds
+  failure, try a bit less. Whatever stays goes out with the next sweep.
+- If a sweep sits unconfirmed too long, `satpost bumpfee <sat/vB>` raises its feerate and pays
+  the difference from your balance. The channel keeps working in the meantime.
+- Don't close the channel to get everything out. Closing gives up the inbound liquidity you paid
+  for, and the next payment that doesn't fit buys it again.
+
 ## Liquidity
 
 - `satpost channels` shows capacity and inbound liquidity: how much more you can receive
