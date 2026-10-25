@@ -23,6 +23,8 @@ services:
     environment:
       TS_HOSTNAME: ${TS_HOSTNAME:-pay}
       TS_AUTHKEY: ${TS_AUTHKEY:-}
+      # Log in with the key once, then reuse the saved state; a single-use key can't log in twice.
+      TS_AUTH_ONCE: 'true'
       TS_STATE_DIR: /var/lib/tailscale
       TS_SERVE_CONFIG: /config/serve.json
     volumes:
