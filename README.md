@@ -74,10 +74,9 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
    enable Pay Links, then create a pay link with your username, your domain, comments allowed and
    zaps on. LNbits pre-fills the domain with the admin page's own address, so replace it with
    yours. LNbits fixes the description wallets show to "Payment to `<username>`".
-6. **Fund the channel.** `satpost fees 35000` shows the purchase fee for a 35k payment; pay
-   comfortably more than that to `satpost invoice 35000 bootstrap` from another wallet, then
-   check `satpost channels`. A payment only just above the estimate can still land in fee
-   credit, because phoenixd decides with a raised feerate.
+6. **Fund the channel.** `satpost fees 35000` shows what opening it costs, and whether a 35k
+   payment opens it or would only become fee credit. Pay `satpost invoice 35000 bootstrap` from
+   another wallet, then check `satpost channels`.
 7. **Open the payment paths.** Set `SATPOST_SERVE=serve.funnel` in `.env` and run
    `satpost up`. From outside your tailnet,
    `https://<TS_HOSTNAME>.<tailnet>.ts.net/.well-known/lnurlp/<username>` now answers.
