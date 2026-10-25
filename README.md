@@ -66,7 +66,9 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
    no longer expires.
 4. **Back up the seed yourself**, on paper, and keep it offline: `satpost seed`. Twelve words
    restore the wallet, channel included (ACINQ keeps an encrypted copy of the channel state for
-   you).
+   you). To use your own entropy instead, for example dice rolls on a SeedSigner, run
+   `satpost restore --replace` before funding the channel, then `satpost setup`. It only replaces
+   a wallet that has never had a channel or funds.
 5. **LNbits.** Open `https://<TS_HOSTNAME>.<tailnet>.ts.net:8443`, finish the first install with
    `LNBITS_FIRST_INSTALL_TOKEN` from `.env`, and turn on two-factor login. Under Extensions,
    enable Pay Links, then create a pay link with your username, your domain, comments allowed and

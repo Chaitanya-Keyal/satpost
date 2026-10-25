@@ -110,13 +110,32 @@ Next, in order (README.md has the details):
 EOF
 }
 
+brand_new() { # phoenixd answers, and has no channel and nothing in any balance or fee credit
+  local channels balance
+  channels=$(cli listchannels 2>/dev/null) || return 1
+  balance=$(cli getbalance 2>/dev/null) || return 1
+  [[ $channels =~ ^[[:space:]]*\[[[:space:]]*\][[:space:]]*$ ]] || return 1
+  [[ $balance == *'"balanceSat"'* ]] || return 1
+  [[ ! $balance =~ \"[A-Za-z]*Sat\":[[:space:]]*[1-9] ]]
+}
+
 restore() {
   [ -f "$env_file" ] || { echo "Run setup first to create .env." >&2; exit 1; }
+  local replace=
+  [ "${1:-}" = --replace ] && replace=1
   # One-off phoenixd containers join the ts container's namespace, so it has to be up.
   dc up -d ts </dev/null >/dev/null
   if dc run --rm --no-deps -T --entrypoint test phoenixd -f /phoenix/.phoenix/seed.dat </dev/null 2>/dev/null; then
-    echo "This wallet already has a seed; refusing to overwrite it." >&2
-    exit 1
+    if [ -z "$replace" ]; then
+      echo "This wallet already has a seed; refusing to overwrite it." >&2
+      echo "A wallet that has never had a channel or funds can take another seed with --replace." >&2
+      exit 1
+    fi
+    if ! brand_new; then
+      echo "Refusing to replace the seed: phoenixd isn't running, or this wallet has a channel," >&2
+      echo "a balance or fee credit. Replacing it would strand those funds." >&2
+      exit 1
+    fi
   fi
   local words word list
   if [ -t 0 ]; then
@@ -132,6 +151,13 @@ restore() {
   if [ ${#list[@]} -ne 12 ] && [ ${#list[@]} -ne 24 ]; then
     echo "Expected 12 or 24 words, got ${#list[@]}." >&2
     exit 1
+  fi
+  if [ -n "$replace" ]; then
+    # The old wallet's database is named after its node, so it goes with the old seed.
+    # phoenix.conf stays, and with it the passwords LNbits and any dashboard use.
+    dc stop phoenixd </dev/null >/dev/null
+    dc run --rm --no-deps -T --entrypoint sh phoenixd -c \
+      'rm -f /phoenix/.phoenix/seed.dat /phoenix/.phoenix/phoenix.*.db /phoenix/.phoenix/phoenix.*.db-*' </dev/null
   fi
   printf '%s\n' "${list[*]}" |
     dc run --rm --no-deps -T --entrypoint sh phoenixd -c 'umask 077; cat >/phoenix/.phoenix/seed.dat'
@@ -179,7 +205,8 @@ usage() {
 usage: satpost <command>
 
   setup                                first start; safe to re-run
-  restore                              put an existing seed in place, before the first setup
+  restore [--replace]                  put your own seed in place: before the first setup, or with
+                                       --replace on a wallet that has never had a channel or funds
   seed                                 show the seed, to write it down (interactive only)
   up                                   apply changes to .env, e.g. SATPOST_SERVE
   update                               pull the versions set in .env and restart
@@ -203,7 +230,7 @@ cmd=${1:-help}
 [ $# -gt 0 ] && shift
 case $cmd in
   setup) setup ;;
-  restore) restore ;;
+  restore) restore "$@" ;;
   seed) seed ;;
   up) dc up -d ;;
   update) dc pull && dc up -d ;;
