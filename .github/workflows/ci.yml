@@ -25,5 +25,6 @@ jobs:
         run: npx --yes prettier@3.9.6 --check .
       - name: compose files
         run: |
-          docker compose -f compose.yml config --no-interpolate --quiet
-          docker compose -f compose.yml -f compose.test.yml config --no-interpolate --quiet
+          cp .env.example .env
+          docker compose -f compose.yml config --quiet
+          docker compose -f compose.yml -f compose.test.yml config --quiet
