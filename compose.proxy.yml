@@ -57,6 +57,10 @@ services:
 networks:
   internal:
     internal: true
+    # Docker gives the host an address on every bridge, internal ones too, and with it a way to
+    # LNbits through the forwarder. Isolated mode leaves the host off this one.
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
   public:
     name: ${SATPOST_PROXY_NETWORK:?set SATPOST_PROXY_NETWORK in .env, see compose.proxy.yml}
     external: true

@@ -19,7 +19,7 @@ address (both images bind `0.0.0.0` by default; compose.yml overrides it).
 The internet reaches those paths through Tailscale Funnel, or through a reverse proxy or tunnel
 of your own ([public-paths.md](public-paths.md)). With your own, satpost's nginx proxy runs in
 its own namespace and reaches only LNbits, through a forwarder that listens on an internal
-network shared with nothing else; phoenixd's API stays out of its reach. Your provider ends
+network shared with nothing else, not even the host; phoenixd's API stays out of its reach. Your provider ends
 TLS, though, so it reads the requests: amounts, comments, zap requests and payers' addresses.
 
 ## The receive-only password
