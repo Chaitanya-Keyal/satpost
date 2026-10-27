@@ -46,17 +46,22 @@ Watch the [phoenixd](https://github.com/ACINQ/phoenixd/releases),
 Releases), and Tailscale's [security bulletins](https://tailscale.com/security-bulletins). Update
 LNbits promptly: two of its endpoints are public. The Tailscale container never updates itself,
 unlike Tailscale on your own devices, so bump `TAILSCALE_VERSION` when a bulletin names it.
+With compose.proxy.yml, also watch nginx's
+[security advisories](https://nginx.org/en/security_advisories.html) and pin `NGINX_VERSION`
+the same way. A running nginx keeps the configuration it started with, so after an update that
+changes `proxy/`, run `docker compose up -d --force-recreate proxy forwarder`.
 LNbits installs its extensions itself, so the LNURLp version isn't pinned by the image; update it
 from LNbits' admin page when LNbits offers a new one.
 
 ## Restarting
 
-phoenixd and LNbits share the Tailscale container's network namespace, and Docker gives a
-container a new namespace each time it starts. If the Tailscale container restarts on its own,
-after a crash or a `docker restart`, the other two stay in the old one: Docker still shows them
-as up, but nothing reaches them, and phoenixd loses its channel peer. `docker compose restart`
-can leave them the same way. To restart everything, run `docker compose up -d --force-recreate`
-from the satpost folder; `satpost up` only replaces containers whose settings changed.
+phoenixd and LNbits (and, with compose.proxy.yml, the forwarder) share the Tailscale
+container's network namespace, and Docker gives a container a new namespace each time it
+starts. If the Tailscale container restarts on its own, after a crash or a `docker restart`,
+the others stay in the old one: Docker still shows them as up, but nothing reaches them, and
+phoenixd loses its channel peer. `docker compose restart` can leave them the same way. To
+restart everything, run `docker compose up -d --force-recreate` from the satpost folder;
+`satpost up` only replaces containers whose settings changed.
 
 ## Backups
 

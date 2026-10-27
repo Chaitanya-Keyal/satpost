@@ -1,0 +1,62 @@
+# Optional: serves the two payment paths through your own reverse proxy or tunnel, such as a
+# Cloudflare Tunnel, instead of Tailscale Funnel. docs/public-paths.md compares the two and walks
+# through the switch. In .env:
+#   COMPOSE_FILE=compose.yml:compose.proxy.yml
+#   SATPOST_PROXY_NETWORK=<an existing Docker network your proxy or tunnel container is on>
+# then route https://<your host> to http://satpost-web:8080 on that network.
+#
+#   your proxy ──► proxy: its own namespace; GET on the two paths, 404 for everything else
+#                    │  internal network, shared with nothing else
+#                    ▼
+#                  forwarder: in the shared namespace ──► LNbits 127.0.0.1:5000
+#
+# The proxy never joins the shared namespace, so phoenixd's API is out of its reach.
+
+x-nginx: &nginx
+  image: nginxinc/nginx-unprivileged:${NGINX_VERSION:-1.30.6-alpine-slim}
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  pids_limit: 64
+  mem_limit: 32m
+  cpus: 0.25
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+
+services:
+  ts:
+    networks:
+      default: {}
+      # The forwarder listens on ts's address here, which the proxy knows as lnbits.
+      internal:
+        aliases: [lnbits]
+
+  forwarder:
+    <<: *nginx
+    user: '${FORWARDER_UID:-10012}:${FORWARDER_UID:-10012}'
+    network_mode: service:ts
+    entrypoint: [nginx, -c, /etc/satpost/forwarder.conf, -g, 'daemon off;']
+    volumes: [./proxy:/etc/satpost:ro]
+
+  proxy:
+    <<: *nginx
+    user: '${PROXY_UID:-10011}:${PROXY_UID:-10011}'
+    entrypoint: [nginx, -c, /etc/satpost/proxy.conf, -g, 'daemon off;']
+    volumes: [./proxy:/etc/satpost:ro]
+    networks:
+      internal: {}
+      public:
+        aliases: [satpost-web]
+    depends_on: [forwarder]
+
+networks:
+  internal:
+    internal: true
+  public:
+    name: ${SATPOST_PROXY_NETWORK:?set SATPOST_PROXY_NETWORK in .env, see compose.proxy.yml}
+    external: true

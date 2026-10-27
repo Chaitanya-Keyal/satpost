@@ -6,8 +6,8 @@ Get paid at `you@yourdomain.com`, straight into your own [phoenixd](https://gith
 wallet.
 
 - [LNbits](https://github.com/lnbits/lnbits) answers the address, with payer comments and nostr zaps.
-- Only the address lookup and invoice creation are public, through Tailscale Funnel. Everything
-  else stays on your tailnet.
+- Only the address lookup and invoice creation are public, through Tailscale Funnel or a reverse
+  proxy or tunnel of your own. Everything else stays on your tailnet.
 - LNbits only has phoenixd's receive-only password, so nothing public can spend your money.
 - You spend with the `satpost` command over SSH: pay invoices and Lightning addresses, or sweep
   on-chain. It's a small wrapper around phoenix-cli.
@@ -29,7 +29,9 @@ spending:  ssh host → satpost pay … / satpost sweep …
 
 Nothing is published on the host, and the services only listen on localhost inside the
 namespace. Tailscale still forwards tailnet traffic to any port in there, so your tailnet
-policy matters: see [docs/security.md](docs/security.md).
+policy matters: see [docs/security.md](docs/security.md). To serve the two public paths through
+your own reverse proxy or tunnel instead of Funnel, see
+[docs/public-paths.md](docs/public-paths.md), which also compares the two.
 
 ## What it costs
 
@@ -52,9 +54,9 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
 
 ## Setup
 
-1. **Tailscale policy.** Add the `tag:pay` owner, the Funnel attribute and the access rules
-   from [docs/security.md](docs/security.md). Optionally create a single-use, pre-approved auth
-   key tagged `tag:pay`.
+1. **Tailscale policy.** Add the `tag:pay` owner, the Funnel attribute (unless you'll use your
+   own proxy, see step 7) and the access rules from [docs/security.md](docs/security.md).
+   Optionally create a single-use, pre-approved auth key tagged `tag:pay`.
 2. **Configure.** `git clone` this repo on the host and put the command on your PATH:
    `ln -s "$PWD/bin/satpost" ~/.local/bin/satpost`. Run `satpost setup` once to create `.env`,
    edit it (`TS_HOSTNAME`, `TS_AUTHKEY`, `SATPOST_DOCKER`), then run `satpost setup` again. It
@@ -82,7 +84,8 @@ too small to cover the purchase are kept as fee credit, which is non-refundable.
    `https://<TS_HOSTNAME>.<tailnet>.ts.net/.well-known/lnurlp/<username>` now answers, usually
    within a minute or two. Your own devices resolve that name to its tailnet address, so check
    from a phone on mobile data with Tailscale off, or with `curl --resolve` and the address
-   public DNS returns.
+   public DNS returns. To use your own reverse proxy or tunnel instead, follow
+   [docs/public-paths.md](docs/public-paths.md).
 8. **Publish the address file.** Save that response byte for byte as
    `https://yourdomain.com/.well-known/lnurlp/<username>`. On GitHub Pages the dot directory needs
    care: add `.nojekyll` when publishing from a branch, or use `actions/upload-pages-artifact`

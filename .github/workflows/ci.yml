@@ -1,4 +1,5 @@
-# Lints the CLI, and checks formatting and both compose files, on every push and pull request.
+# Lints the CLI, and checks formatting, the compose files and the nginx configs, on every push
+# and pull request.
 name: ci
 
 on:
@@ -28,3 +29,11 @@ jobs:
           cp .env.example .env
           docker compose -f compose.yml config --quiet
           docker compose -f compose.yml -f compose.test.yml config --quiet
+          SATPOST_PROXY_NETWORK=edge docker compose -f compose.yml -f compose.proxy.yml config --quiet
+      - name: nginx configs
+        run: |
+          image=nginxinc/nginx-unprivileged:$(sed -n 's/^NGINX_VERSION=//p' .env.example)
+          for conf in proxy forwarder; do
+            docker run --rm --add-host lnbits:127.0.0.1 -v "$PWD/proxy:/etc/satpost:ro" \
+              --entrypoint nginx "$image" -t -c "/etc/satpost/$conf.conf"
+          done

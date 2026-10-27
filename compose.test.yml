@@ -5,7 +5,8 @@
 #   LNBITS_AUTH_HTTPS_ONLY=false
 # phoenixd's API is then on http://127.0.0.1:19740 and LNbits on http://127.0.0.1:15000. The
 # forwarder also answers on its container address, so other users of the machine can reach
-# both; test on a machine that's only yours.
+# both; test on a machine that's only yours. To test compose.proxy.yml as well, add it to
+# COMPOSE_FILE and create its network first: docker network create --internal <name>.
 services:
   ts:
     image: alpine/socat:1.8.1.3

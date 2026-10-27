@@ -8,13 +8,19 @@ you use it through `satpost` over SSH.
 
 | Exposure           | What                                                                                  | If it's compromised                                                                                                               |
 | ------------------ | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Internet (Funnel)  | `/.well-known/lnurlp/` and `/lnurlp/api/v1/lnurl/cb/` on port 443, answered by LNbits | invoice spam, your payment history readable, and new payments redirected to someone else's invoices until you notice. No spending |
+| Internet           | `/.well-known/lnurlp/` and `/lnurlp/api/v1/lnurl/cb/` on port 443, answered by LNbits | invoice spam, your payment history readable, and new payments redirected to someone else's invoices until you notice. No spending |
 | Tailnet, by policy | LNbits admin on 8443 (its login); phoenixd's API on 9740, for a dashboard you allow   | needs one of your devices plus the app's credentials                                                                              |
 | Host only          | phoenixd's full-access password and the seed, in phoenixd's volume                    | needs root on the host, or a user in the docker group                                                                             |
 
 Nothing is published on the host. phoenixd and LNbits bind `127.0.0.1` inside the shared
 namespace, so other users of the machine can't connect to them through the container's bridge
 address (both images bind `0.0.0.0` by default; compose.yml overrides it).
+
+The internet reaches those paths through Tailscale Funnel, or through a reverse proxy or tunnel
+of your own ([public-paths.md](public-paths.md)). With your own, satpost's nginx proxy runs in
+its own namespace and reaches only LNbits, through a forwarder that listens on an internal
+network shared with nothing else; phoenixd's API stays out of its reach. Your provider ends
+TLS, though, so it reads the requests: amounts, comments, zap requests and payers' addresses.
 
 ## The receive-only password
 
@@ -79,7 +85,8 @@ or automated machine you own. Narrow the admin rule to the devices you actually 
 as `{ "src": "laptop", "accept": ["tag:pay:8443"] }` and
 `{ "src": "server", "deny": ["tag:pay:8443"] }`. Tailscale's
 default policy also gives all your devices the `funnel` attribute. satpost only needs it on
-`tag:pay`, so remove the default one unless you use Funnel elsewhere.
+`tag:pay`, so remove the default one unless you use Funnel elsewhere. With your own proxy
+instead of Funnel, leave the attribute out altogether.
 
 ## Where the secrets live
 
@@ -104,8 +111,10 @@ the admin. `satpost setup` never replaces it on an installed LNbits.
 The containers run on read-only filesystems, without Linux capabilities or a way to gain
 privileges, with CPU, memory and process limits. Tailscale and LNbits run as their own users,
 10005 and 10004 by default (`TS_UID`, `LNBITS_UID`), which shouldn't exist on the host, and
-phoenixd as its image's own user. A one-shot `owners` container hands their volumes to those
-users on every start, so a restored backup gets the right owner too.
+phoenixd as its image's own user. A one-shot `owners` container hands the Tailscale and LNbits
+volumes to their users on every start, so a restored backup gets the right owner too. With
+compose.proxy.yml, the proxy and forwarder run as 10011 and 10012 (`PROXY_UID`,
+`FORWARDER_UID`), and keep nothing on disk.
 
 ## Known gaps
 
