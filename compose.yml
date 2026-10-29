@@ -57,7 +57,7 @@ services:
     tmpfs: [/tmp, '/var/run/tailscale:mode=1777']
     mem_limit: 256m
     cpus: 0.25
-    image: tailscale/tailscale:${TAILSCALE_VERSION:-v1.104.2}
+    image: tailscale/tailscale:${TAILSCALE_VERSION:-v1.104.4}
     hostname: ${TS_HOSTNAME:-pay}
     environment:
       TS_HOSTNAME: ${TS_HOSTNAME:-pay}
