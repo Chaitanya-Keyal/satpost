@@ -31,7 +31,7 @@ services:
   # exits. phoenixd's image already runs as its own user.
   owners:
     <<: *hardening
-    image: lnbits/lnbits:${LNBITS_VERSION:-v1.6.2}
+    image: lnbits/lnbits:${LNBITS_VERSION:-v1.7.0}
     user: '0:0'
     cap_add: [CHOWN, DAC_READ_SEARCH]
     network_mode: none
@@ -97,7 +97,7 @@ services:
     user: '${LNBITS_UID:-10004}:${LNBITS_UID:-10004}'
     mem_limit: 1g
     cpus: 0.5
-    image: lnbits/lnbits:${LNBITS_VERSION:-v1.6.2}
+    image: lnbits/lnbits:${LNBITS_VERSION:-v1.7.0}
     network_mode: service:ts
     # The image starts LNbits through uv, which is installed in root's home where this user
     # can't reach it; the virtualenv's own entry point does the same.

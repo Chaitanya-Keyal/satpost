@@ -50,8 +50,19 @@ With compose.proxy.yml, also watch nginx's
 [security advisories](https://nginx.org/en/security_advisories.html) and pin `NGINX_VERSION`
 the same way. A running nginx keeps the configuration it started with, so after an update that
 changes `proxy/`, run `docker compose up -d --force-recreate proxy forwarder`.
-LNbits installs its extensions itself, so the LNURLp version isn't pinned by the image; update it
-from LNbits' admin page when LNbits offers a new one.
+LNbits installs its extensions itself, so the LNURLp version isn't pinned by the image. From
+LNbits 1.7.0 it updates them on every start and once a day, to the newest release that suits the
+running LNbits. An LNURLp first installed by an older LNbits is recorded without its repository,
+and the automatic update skips it: update it once from LNbits' admin page (Extensions), or from
+the satpost folder with LNbits running:
+
+```
+docker compose exec lnbits sh -c '/app/.venv/bin/lnbits-cli extensions update lnurlp \
+  --url http://127.0.0.1:5000 --admin-user "$(cat /app/data/.super_user)"'
+```
+
+Don't run `lnbits-cli extensions update` with LNbits stopped: on its own it can't load the
+extension, and it leaves the extension disabled.
 
 ## Restarting
 

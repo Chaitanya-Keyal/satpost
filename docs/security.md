@@ -121,13 +121,9 @@ compose.proxy.yml, the proxy and forwarder run as 10011 and 10012 (`PROXY_UID`,
 - **Redirected payments.** Anyone who takes over the internet-facing path can hand out their
   own invoices. Keep LNbits updated and watch that payments keep arriving. A BIP353 record with
   a BOLT12 offer, signed in DNS, removes the live server from the path; it isn't set up here yet.
-- **Zap requests.** LNURLp 1.3.2 stores the zap request a payer sends without checking it,
-  signature included, and publishes a receipt for it. A forged request still gets an invoice;
-  Nostr clients that verify zap receipts discard the result.
 - **Zap relays.** For every paid zap, LNbits connects to each relay the zap request lists, so
-  those relays learn your server's address, which Funnel otherwise hides. LNURLp 1.3.2 also
-  connects to addresses inside your network: blind requests, and phoenixd's API still wants its
-  password. Turn zaps off on the pay link if that matters to you.
-- Both are fixed in LNURLp's next release (1.4.0): it validates zap requests and refuses
-  non-public addresses. Update it from LNbits' admin page once LNbits offers it.
+  those relays learn your server's address, which the public paths otherwise hide. Since
+  LNURLp 1.4.0 it checks each relay's address first and won't connect to private ones, and it
+  rejects zap requests whose signature doesn't verify. Turn zaps off on the pay link if your
+  server's address matters to you.
 - **ACINQ** sees your payments and is your only channel peer.
