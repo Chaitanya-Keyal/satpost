@@ -78,8 +78,12 @@ restart everything, run `docker compose up -d --force-recreate` from the satpost
 
 - **The seed** is the wallet's only backup: 12 (or 24) words on paper. It restores
   the channel too, because ACINQ keeps an encrypted copy of its latest state.
-- **Never back up phoenixd's database to restore later.** Channel state goes stale with the
-  next payment, and restoring an old copy can publish a revoked state, which loses the channel.
+- **phoenixd's database isn't a backup.** Its channel state is out of date after the next
+  payment. If an old copy does start, from a disk image say, phoenixd won't publish its outdated
+  state: it takes the latest from the encrypted copy ACINQ keeps, or, failing that, asks ACINQ
+  to close the channel, and the balance comes back on-chain. What costs you the channel is
+  running two copies of the wallet at once, or force-closing from an old copy before
+  `satpost channels` shows it in sync again.
 - **Payment history**, for your records: `satpost export history.csv`.
 - **LNbits' data** (the pay link, payer comments, the zap key and the receive-only password),
   if you want it kept. Keep it private and encrypt it if it leaves the server. From the
